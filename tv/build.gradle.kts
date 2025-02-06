@@ -98,6 +98,21 @@ dependencies {
         implementation(libs.androidx.media3.exoplayer.rtsp)
     }
 
+//    implementation ("tv.danmaku.ijk.media:ijkplayer-java:0.8.8")
+//    implementation ("tv.danmaku.ijk.media:ijkplayer-armv7a:0.8.8")
+//    implementation ("tv.danmaku.ijk.media:ijkplayer-arm64:0.8.8")
+//    implementation ("tv.danmaku.ijk.media:ijkplayer-x86:0.8.8")
+//    implementation ("tv.danmaku.ijk.media:ijkplayer-x86_64:0.8.8")
+
+    implementation("com.github.CarGuo:GSYIjkJava:1.0.0")
+
+    //根据你的需求ijk模式的so
+//    implementation("com.github.CarGuo.GSYVideoPlayer:gsyVideoPlayer-arm64:v8.6.0-release-jitpack")
+    implementation("com.github.CarGuo.GSYVideoPlayer:gsyVideoPlayer-armv7a:v8.6.0-release-jitpack")
+    implementation("com.github.CarGuo.GSYVideoPlayer:gsyVideoPlayer-armv5:v8.6.0-release-jitpack")
+    implementation("com.github.CarGuo.GSYVideoPlayer:gsyVideoPlayer-x86:v8.6.0-release-jitpack")
+    implementation("com.github.CarGuo.GSYVideoPlayer:gsyVideoPlayer-x64:v8.6.0-release-jitpack")
+
     // 二维码
     implementation(libs.qrose)
 

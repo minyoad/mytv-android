@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import top.yogiczy.mytv.tv.ui.screens.videoplayer.player.IjkVideoPlayer
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.player.Media3VideoPlayer
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.player.VideoPlayer
 
@@ -136,7 +137,8 @@ fun rememberVideoPlayerState(
     val coroutineScope = rememberCoroutineScope()
     val state = remember {
         VideoPlayerState(
-            Media3VideoPlayer(context, coroutineScope),
+            IjkVideoPlayer(context, coroutineScope),
+//            Media3VideoPlayer(context, coroutineScope),
             defaultDisplayModeProvider,
         )
     }
