@@ -25,7 +25,6 @@ include(":core:data")
 include(":core:util")
 include(":core:designsystem")
 include(":tv")
-include(":mobile")
 
 val mediaSettingsFile = file("../media/core_settings.gradle")
 if (mediaSettingsFile.exists()) {

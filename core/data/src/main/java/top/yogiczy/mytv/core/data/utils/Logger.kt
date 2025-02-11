@@ -35,7 +35,7 @@ class Logger private constructor(
     }
 
     companion object {
-        fun create(tag: String) = Logger(tag)
+        fun create(tag: String) = Logger("mytv_"+tag)
 
         private var _history = mutableListOf<HistoryItem>()
         val history: List<HistoryItem>
