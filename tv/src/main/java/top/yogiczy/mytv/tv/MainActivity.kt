@@ -48,9 +48,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-
-//        HttpServer.start(applicationContext, showToast = {
-//            LeanbackToastState.I.showToast(it, id = "httpServer")
-//        })
+        HttpServer.start(applicationContext);
     }
 }
