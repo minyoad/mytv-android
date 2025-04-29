@@ -60,7 +60,7 @@ fun WebViewScreen(
                     settings.useWideViewPort = true
                     settings.loadWithOverviewMode = true
                     settings.domStorageEnabled = true
-                    settings.databaseEnabled = true
+//                    settings.databaseEnabled = true
                     settings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
                     settings.loadsImagesAutomatically = true
                     settings.blockNetworkImage = false

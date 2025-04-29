@@ -48,3 +48,23 @@
     @com.google.gson.annotations.SerializedName <fields>;
 }
 
+# 保留所有 native 方法
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# 保留 JNI 相关类
+-keep class * implements android.os.Parcelable {
+    *;
+}
+
+# 保留 IJKPlayer 相关类
+-keep class tv.danmaku.ijk.media.player.** { *; }
+-keep interface tv.danmaku.ijk.media.player.** { *; }
+
+-keep class com.aliyun.rts.network.** { *; }
+-keep class com.wangsu.httpclient.** { *; }
+
+# 保留 WsRtcClassLoader 及其相关类
+-keep class com.wangsu.httpclient.** { *; }
+-keep class com.wangsu.wsrtc.** { *; }

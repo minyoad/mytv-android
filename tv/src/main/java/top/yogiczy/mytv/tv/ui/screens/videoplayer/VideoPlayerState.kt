@@ -18,6 +18,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.player.Media3VideoPlayer
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.player.VideoPlayer
+import top.yogiczy.mytv.tv.ui.screens.videoplayer.player.IJKVideoPlayer
+
 
 @Stable
 class VideoPlayerState(
@@ -136,7 +138,7 @@ fun rememberVideoPlayerState(
     val coroutineScope = rememberCoroutineScope()
     val state = remember {
         VideoPlayerState(
-            Media3VideoPlayer(context, coroutineScope),
+            IJKVideoPlayer(context, coroutineScope),
             defaultDisplayModeProvider,
         )
     }

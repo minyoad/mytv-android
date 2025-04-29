@@ -32,3 +32,4 @@ if (mediaSettingsFile.exists()) {
     (gradle as ExtensionAware).extra["androidxMediaModulePrefix"] = "media3:"
     apply(from = mediaSettingsFile)
 }
+include(":ijkplayer-java")

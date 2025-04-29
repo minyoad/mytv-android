@@ -25,3 +25,4 @@ key.properties
 keystore.jks
 .kotlin
 /release
+app/build/
