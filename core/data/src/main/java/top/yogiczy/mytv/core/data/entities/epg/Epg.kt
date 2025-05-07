@@ -18,7 +18,7 @@ data class Epg(
     /**
      * 节目列表
      */
-    val programmeList: EpgProgrammeList = EpgProgrammeList(),
+    val programmeList: List<EpgProgramme> = EpgProgrammeList(),
 ) {
     companion object {
         private val log = Logger.create(javaClass.simpleName)
@@ -43,7 +43,7 @@ data class Epg(
                 }
             }
 
-            log.d("channel=${channel},liveProgramIndex=$liveProgramIndex")
+//            log.d("channel=${channel},liveProgramIndex=$liveProgramIndex")
 
             return if (liveProgramIndex >= 0) {
                 EpgProgrammeRecent(

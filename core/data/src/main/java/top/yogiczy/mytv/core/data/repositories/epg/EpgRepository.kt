@@ -39,59 +39,85 @@ class EpgRepository(
         xmlString: String,
         filteredChannels: List<String> = emptyList(),
     ) = withContext(Dispatchers.Default) {
-        fun parseTime(time: String): Long {
-            if (time.length < 14) return 0
-
-            return SimpleDateFormat("yyyyMMddHHmmss Z", Locale.getDefault())
-                .parse(time)?.time ?: 0
+        val dateFormat = SimpleDateFormat("yyyyMMddHHmmss Z", Locale.getDefault())
+        val lowerFilteredChannels = filteredChannels.map { it.lowercase() }
+        val parser = Xml.newPullParser().apply {
+            setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+            setInput(StringReader(xmlString))
         }
 
-        val parser: XmlPullParser = Xml.newPullParser()
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
-        parser.setInput(StringReader(xmlString))
-
         val epgMap = mutableMapOf<String, Epg>()
+        var currentChannelId: String? = null
 
-        var eventType = parser.eventType
-        while (eventType != XmlPullParser.END_DOCUMENT) {
-            when (eventType) {
-                XmlPullParser.START_TAG -> {
-                    if (parser.name == "channel") {
-                        val channelId = parser.getAttributeValue(null, "id")
-                        parser.nextTag()
-                        val channelName = parser.nextText()
+        fun getSafeText(): String {
+            return try {
+                parser.nextText().trim().replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+            } catch (e: Exception) {
+                log.e("解析XML文本失败", e)
+                ""
+            }
+        }
 
-                        if (filteredChannels.isEmpty() || filteredChannels.contains(channelName.lowercase())) {
-                            epgMap[channelId] = Epg(channelName, EpgProgrammeList())
+        // 定义时间格式,年份-月份-日期 小时:分钟
+        val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+
+        while (parser.next() != XmlPullParser.END_DOCUMENT) {
+            try {
+                when (parser.eventType) {
+                    XmlPullParser.START_TAG -> when (parser.name) {
+                        "channel" -> {
+                            currentChannelId = parser.getAttributeValue(null, "id")
+                            parser.nextTag()
+                            val channelName = getSafeText()
+
+                            if (lowerFilteredChannels.isEmpty() ||
+                                channelName.lowercase() in lowerFilteredChannels) {
+                                epgMap[currentChannelId] = Epg(channelName, EpgProgrammeList())
+                            }
                         }
-                    } else if (parser.name == "programme") {
-                        val channelId = parser.getAttributeValue(null, "channel")
-                        val startTime = parser.getAttributeValue(null, "start")
-                        val stopTime = parser.getAttributeValue(null, "stop")
-                        parser.nextTag()
-                        val title = parser.nextText()
+                        "programme" -> {
+                            val channelId = parser.getAttributeValue(null, "channel")
+                            val startTime = parser.getAttributeValue(null, "start")
+                            val stopTime = parser.getAttributeValue(null, "stop")
+                            parser.nextTag()
+                            val title = getSafeText()
 
-                        epgMap[channelId]?.let { epg ->
-                            epgMap[channelId] = epg.copy(
-                                programmeList = EpgProgrammeList(
-                                    epg.programmeList + listOf(
-                                        EpgProgramme(
-                                            startAt = parseTime(startTime),
-                                            endAt = parseTime(stopTime),
-                                            title = title,
-                                        )
-                                    )
+                            epgMap[channelId]?.let { epg ->
+                                val newProgramme = EpgProgramme(
+                                    startAt = dateFormat.parse(startTime)?.time ?: 0,
+                                    endAt = dateFormat.parse(stopTime)?.time ?: 0,
+                                    title = title
                                 )
-                            )
+
+                                // 添加去重检查：开始时间相同的节目不重复添加
+                                val isDuplicate = epg.programmeList.any { prog ->
+                                    timeFormat.format(prog.startAt) == timeFormat.format(newProgramme.startAt)
+//                                    prog.title == newProgramme.title &&
+//                                            prog.startAt == newProgramme.startAt &&
+//                                            prog.endAt == newProgramme.endAt
+                                }
+
+                                if (!isDuplicate) {
+                                    epgMap[channelId] = epg.copy(
+                                        programmeList = epg.programmeList + newProgramme
+                                    )
+                                } else {
+                                    log.d("发现重复节目: ${newProgramme.title} (${timeFormat.format(newProgramme.startAt)})")
+                                }
+                            }
                         }
                     }
                 }
+            } catch (e: Exception) {
+                log.e("解析XML标签失败", e)
+                continue
             }
-            eventType = parser.next()
         }
 
         log.i("解析节目单完成，共${epgMap.size}个频道，${epgMap.values.sumOf { it.programmeList.size }}个节目")
-        return@withContext EpgList(epgMap.values.toList())
+        EpgList(epgMap.values.toList())
     }
 
     /**

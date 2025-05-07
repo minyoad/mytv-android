@@ -66,6 +66,10 @@ object Constants {
                 name = "默认节目单 回看七天",
                 url = "https://e.erw.cc/all.xml.gz",
             ),
+            EpgSource(
+                name = "默认节目单 mybacc 备用",
+                url = "https://iptv-cdn.mybacc.com/epg/e.xml.gz",
+            ),
         )
     )
 
