@@ -19,9 +19,3 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
-
-# Keep WsRtcClassLoader
--keep class com.wangsu.httpclient.WsRtcClassLoader { *; }
-
-# Keep WsRtcClassLoader and related classes
--keep class com.wangsu.httpclient.** { *; }

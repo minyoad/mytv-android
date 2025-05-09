@@ -35,6 +35,21 @@ class IJKVideoPlayer(
             setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "enable-accurate-seek", 1)
 
             setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0)
+
+            // 启用rtsp协议支持
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "rtsp,http,https,tcp,tls,udp")
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_transport", "tcp")  // 强制使用TCP传输
+
+            // 添加以下配置优化网络和缓冲
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 1) // 自动重连
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer") // 减少缓冲
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max-buffer-size", "1024000") // 设置最大缓冲大小
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_flags", "prefer_tcp") // 优先使用TCP
+
+            // 针对数据包损坏的处理
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "skip_loop_filter", 48) // 跳过循环过滤
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "skip_frame", 48) // 跳过帧
+
         }
     }
     
@@ -107,6 +122,9 @@ class IJKVideoPlayer(
         ijkPlayer.release()
         super.release()
     }
+    // 在类中添加重试计数器
+    private var retryCount = 0
+    private val MAX_RETRY_COUNT = 3
 
     override fun prepare(url: String) {
         try {
@@ -119,8 +137,15 @@ class IJKVideoPlayer(
             ijkPlayer.prepareAsync()
         } catch (e: Exception) {
             log.e("prepare error", e)
-            triggerError(PlaybackException("PrepareError", -1))
-        }
+            if (retryCount < MAX_RETRY_COUNT) {
+                retryCount++
+                coroutineScope.launch {
+                    delay(1000)
+                    prepare(url) // 自动重试
+                }
+            } else {
+                triggerError(PlaybackException("PrepareError", -1))
+            }        }
     }
 
     override fun play() {
