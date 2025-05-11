@@ -20,36 +20,56 @@ class IJKVideoPlayer(
     private val coroutineScope: CoroutineScope,
 ) : VideoPlayer(coroutineScope) {
     private val log = Logger.create(javaClass.simpleName)
+
+    private var currentUrl: String? = null
+    private var retryCount = 0
+    private val MAX_RETRY_COUNT = 3
     
     private val ijkPlayer by lazy {
         IjkMediaPlayer().apply {
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 1)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 0)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 1)
+            // 基础播放器配置
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0) // 禁用硬解码
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 0) // 禁用硬解码自动旋转
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 0) // 禁用硬解码分辨率变化处理
             setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 1)
-
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "overlay-format", IjkMediaPlayer.SDL_FCC_RV32.toLong())
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "enable-accurate-seek", 1)
-
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0)
-
-            // 启用rtsp协议支持
+            
+            // Seek优化配置
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "enable-accurate-seek", 1) // 启用精确seek
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "seek-at-start", 0) // 禁用启动时seek
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer") // 禁用文件缓冲，减少seek延迟
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "enable-seek-forward", 1) // 启用向前seek优化
+            
+            // RTSP协议支持和优化
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "rtsp,http,https,tcp,tls,udp")
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_transport", "tcp")  // 强制使用TCP传输
-
-            // 添加以下配置优化网络和缓冲
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 1) // 自动重连
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer") // 减少缓冲
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max-buffer-size", "1024000") // 设置最大缓冲大小
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_flags", "prefer_tcp") // 优先使用TCP
-
-            // 针对数据包损坏的处理
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "skip_loop_filter", 48) // 跳过循环过滤
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "skip_frame", 48) // 跳过帧
-
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_transport", "tcp")
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_flags", "prefer_tcp")
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "stimeout", 30000000) // RTSP超时设置为30秒
+            
+            // 网络和缓冲优化
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 1)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "buffer_size", 1024 * 1024) // 降低缓冲区到1MB以减少seek延迟
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0) // 禁用包缓冲以减少seek延迟
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max_delay", 100) // 降低最大延迟到100ms
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 0) // 禁用无限缓冲
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 1000) // 降低分析时长到1000ms
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024 * 1024) // 降低探测大小到1MB
+            
+            // H.264解码优化
+            setOption(IjkMediaPlayer.OPT_CATEGORY_CODEC, "skip_loop_filter", 48) // 跳过循环滤波以提高性能
+            setOption(IjkMediaPlayer.OPT_CATEGORY_CODEC, "skip_frame", 0) // 不跳帧
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5) // 允许更多丢帧以保持流畅
+            setOption(IjkMediaPlayer.OPT_CATEGORY_CODEC, "threads", "auto") // 自动选择解码线程数
+            
+            // 错误恢复和容错
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "sync-av-start", 0) // 关闭音视频同步等待
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "safe", 0) // 不安全模式，提高兼容性
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "reconnect_at_eof", 1) // 文件结束时重连
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_streamed", 1) // 流媒体断开自动重连
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_delay_max", 4000) // 最大重连延迟4秒
+            
+            // 音频处理
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 1) // 使用OpenSL ES
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "overlay-format", IjkMediaPlayer.SDL_FCC_RV32.toLong())
         }
     }
     
@@ -122,11 +142,9 @@ class IJKVideoPlayer(
         ijkPlayer.release()
         super.release()
     }
-    // 在类中添加重试计数器
-    private var retryCount = 0
-    private val MAX_RETRY_COUNT = 3
 
     override fun prepare(url: String) {
+        currentUrl = url
         try {
             ijkPlayer.reset()
             // 在设置数据源前确保Surface有效
@@ -135,17 +153,23 @@ class IJKVideoPlayer(
             }
             ijkPlayer.setDataSource(context, Uri.parse(url))
             ijkPlayer.prepareAsync()
+            retryCount = 0
         } catch (e: Exception) {
-            log.e("prepare error", e)
-            if (retryCount < MAX_RETRY_COUNT) {
-                retryCount++
-                coroutineScope.launch {
-                    delay(1000)
-                    prepare(url) // 自动重试
-                }
-            } else {
-                triggerError(PlaybackException("PrepareError", -1))
-            }        }
+            handleError(e)
+        }
+    }
+    // 添加错误处理方法
+    private fun handleError(e: Exception) {
+        log.e("playback error", e)
+        if (retryCount < MAX_RETRY_COUNT) {
+            retryCount++
+            coroutineScope.launch {
+                delay(1000 * retryCount.toLong()) // 指数退避
+                currentUrl?.let { prepare(it) }
+            }
+        } else {
+            triggerError(PlaybackException("PlaybackError", -1))
+        }
     }
 
     override fun play() {

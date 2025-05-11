@@ -16,6 +16,7 @@ import top.yogiczy.mytv.tv.ui.screens.videoplayer.VideoPlayerDisplayMode
 import top.yogiczy.mytv.tv.ui.utils.Configs
 
 class SettingsViewModel : ViewModel() {
+    var onVideoPlayerTypeChanged: ((Configs.VideoPlayerType) -> Unit)? = null
     private var _appBootLaunch by mutableStateOf(Configs.appBootLaunch)
     var appBootLaunch: Boolean
         get() = _appBootLaunch
@@ -192,6 +193,23 @@ class SettingsViewModel : ViewModel() {
             _iptvHybridMode = value
             Configs.iptvHybridMode = value
         }
+        
+    private var _videoPlayerType by mutableStateOf(Configs.videoPlayerType)
+    var videoPlayerType: Configs.VideoPlayerType
+        get() = _videoPlayerType
+        set(value) {
+            _videoPlayerType = value
+            Configs.videoPlayerType = value
+            onVideoPlayerTypeChanged?.invoke(value)
+        }
+
+    var videoPlayerTypeValue: Configs.VideoPlayerType = Configs.VideoPlayerType.MEDIA3
+        get() = videoPlayerType
+    
+    fun getVideoPlayerTypeLabel(type: Configs.VideoPlayerType): String = when (type) {
+        Configs.VideoPlayerType.IJK -> "IJK播放器"
+        Configs.VideoPlayerType.MEDIA3 -> "Media3播放器"
+    }
 
     private var _epgEnable by mutableStateOf(Configs.epgEnable)
     var epgEnable: Boolean

@@ -4,6 +4,7 @@ import android.view.SurfaceView
 import android.view.TextureView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -16,16 +17,25 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
+import top.yogiczy.mytv.tv.ui.screens.settings.SettingsViewModel
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.player.Media3VideoPlayer
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.player.VideoPlayer
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.player.IJKVideoPlayer
+import top.yogiczy.mytv.tv.ui.utils.Configs
 
 
 @Stable
 class VideoPlayerState(
-    private val instance: VideoPlayer,
+    private var instance: VideoPlayer,
+    private val settingsViewModel: SettingsViewModel,
+    private val context: android.content.Context,
+    private val coroutineScope: kotlinx.coroutines.CoroutineScope,
     private var defaultDisplayModeProvider: () -> VideoPlayerDisplayMode = { VideoPlayerDisplayMode.ORIGINAL },
 ) {
+    private var currentUrl: String? = null
+    private var currentSurface: Any? = null
+    private var currentTexture: Any? = null
     /** 显示模式 */
     var displayMode by mutableStateOf(defaultDisplayModeProvider())
 
@@ -72,10 +82,12 @@ class VideoPlayerState(
     }
 
     fun setVideoSurfaceView(surfaceView: SurfaceView) {
+        currentSurface = surfaceView
         instance.setVideoSurfaceView(surfaceView)
     }
 
     fun setVideoTextureView(textureView: TextureView) {
+        currentTexture = textureView
         instance.setVideoTextureView(textureView)
     }
 
@@ -95,10 +107,45 @@ class VideoPlayerState(
         onInterruptListeners.add(listener)
     }
 
+
     fun initialize() {
         instance.initialize()
         instance.onResolution { width, height ->
             if (width > 0 && height > 0) aspectRatio = width.toFloat() / height
+        }
+        
+        // 监听播放器类型变化
+        settingsViewModel.videoPlayerTypeValue = Configs.videoPlayerType
+        settingsViewModel.onVideoPlayerTypeChanged = { type ->
+            currentUrl?.let { url ->
+                val newInstance = when (type) {
+                    Configs.VideoPlayerType.IJK -> IJKVideoPlayer(context, coroutineScope)
+                    Configs.VideoPlayerType.MEDIA3 -> Media3VideoPlayer(context, coroutineScope)
+                    else -> IJKVideoPlayer(context, coroutineScope)
+                }
+                
+                // 保存当前播放状态
+                val wasPlaying = isPlaying
+                val position = currentPosition
+                
+                // 释放旧实例
+                instance.release()
+                
+                // 创建新实例
+                instance = newInstance
+                initialize()
+                
+                // 恢复播放状态
+                prepare(url)
+                seekTo(position)
+                if (wasPlaying) play()
+                
+                // 恢复surface
+                when (currentSurface) {
+                    is SurfaceView -> setVideoSurfaceView(currentSurface as SurfaceView)
+                    is TextureView -> setVideoTextureView(currentTexture as TextureView)
+                }
+            }
         }
         instance.onError { ex ->
             error = ex?.let { "${it.errorCodeName}(${it.errorCode})" }
@@ -132,6 +179,7 @@ class VideoPlayerState(
 @Composable
 fun rememberVideoPlayerState(
     defaultDisplayModeProvider: () -> VideoPlayerDisplayMode = { VideoPlayerDisplayMode.ORIGINAL },
+    settingsViewModel: SettingsViewModel = viewModel(),
 ): VideoPlayerState {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -139,6 +187,9 @@ fun rememberVideoPlayerState(
     val state = remember {
         VideoPlayerState(
             IJKVideoPlayer(context, coroutineScope),
+            settingsViewModel,
+            context,
+            coroutineScope,
             defaultDisplayModeProvider,
         )
     }

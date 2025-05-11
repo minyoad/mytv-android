@@ -139,6 +139,20 @@ fun SettingsCategoryVideoPlayer(
 
         item {
             SettingsListItem(
+                headlineContent = "播放器类型",
+                trailingContent = settingsViewModel.getVideoPlayerTypeLabel(settingsViewModel.videoPlayerType),
+                onSelected = {
+                    settingsViewModel.videoPlayerType = if (settingsViewModel.videoPlayerType == Configs.VideoPlayerType.IJK) {
+                        Configs.VideoPlayerType.MEDIA3
+                    } else {
+                        Configs.VideoPlayerType.IJK
+                    }
+                },
+            )
+        }
+
+        item {
+            SettingsListItem(
                 headlineContent = "播放器自定义UA",
                 supportingContent = settingsViewModel.videoPlayerUserAgent,
                 remoteConfig = true,

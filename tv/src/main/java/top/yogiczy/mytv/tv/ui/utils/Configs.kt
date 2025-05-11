@@ -147,6 +147,9 @@ object Configs {
         /** 播放器 渲染方式 */
         VIDEO_PLAYER_RENDER_MODE,
 
+        /** 播放器 类型 */
+        VIDEO_PLAYER_TYPE,
+
         /** 播放器 停止上一媒体项 */
         VIDEO_PLAYER_STOP_PREVIOUS_MEDIA_ITEM,
 
@@ -409,6 +412,17 @@ object Configs {
     var videoPlayerSkipMultipleFramesOnSameVSync: Boolean
         get() = SP.getBoolean(KEY.VIDEO_PLAYER_SKIP_MULTIPLE_FRAMES_ON_SAME_VSYNC.name, false)
         set(value) = SP.putBoolean(KEY.VIDEO_PLAYER_SKIP_MULTIPLE_FRAMES_ON_SAME_VSYNC.name, value)
+
+    /** 播放器类型 */
+    enum class VideoPlayerType(val label: String) {
+        IJK("IJK Player"),
+        MEDIA3("Media3 Player")
+    }
+
+    /** 播放器类型 */
+    var videoPlayerType: VideoPlayerType
+        get() = VideoPlayerType.valueOf(SP.getString(KEY.VIDEO_PLAYER_TYPE.name, VideoPlayerType.IJK.name))
+        set(value) = SP.putString(KEY.VIDEO_PLAYER_TYPE.name, value.name)
 
     enum class UiTimeShowMode(val value: Int) {
         /** 隐藏 */
