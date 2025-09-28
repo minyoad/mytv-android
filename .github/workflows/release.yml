@@ -21,7 +21,8 @@ jobs:
         run: |
           echo "RELEASE_TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
           echo "APK_URL=${{ github.event.release.assets[0].browser_download_url }}" >> $GITHUB_ENV  # 获取 APK 下载链接
-          echo "RELEASE_BODY=${{ github.event.release.body }}" >> $GITHUB_ENV
+          BODY_ESCAPED=$(echo "$BODY" | sed ':a;N;$!ba;s/\n/\\n/g')
+          echo "RELEASE_BODY=$BODY_ESCAPED" >> $GITHUB_ENV
 
       - name: Update JSON file
         run: |
@@ -43,3 +44,4 @@ jobs:
           git add json-repo/tv-stable.json  # 更新为目标 JSON 文件路径
           git commit -m "Update release information for ${RELEASE_TAG}"
           git push
+
