@@ -364,11 +364,11 @@ class SettingsViewModel : ViewModel() {
         }
 
     private var _videoPlayerForceAudioSoftDecode by mutableStateOf(false)
-    var videoPlayerForceAudioSoftDecode: Boolean
+    var videoPlayerForceSoftDecode: Boolean
         get() = _videoPlayerForceAudioSoftDecode
         set(value) {
             _videoPlayerForceAudioSoftDecode = value
-            Configs.videoPlayerForceAudioSoftDecode = value
+            Configs.videoPlayerForceSoftDecode = value
         }
 
     private var _videoPlayerRenderMode by mutableStateOf(Configs.VideoPlayerRenderMode.SURFACE_VIEW)
@@ -444,7 +444,7 @@ class SettingsViewModel : ViewModel() {
         _videoPlayerUserAgent = Configs.videoPlayerUserAgent
         _videoPlayerLoadTimeout = Configs.videoPlayerLoadTimeout
         _videoPlayerAspectRatio = Configs.videoPlayerDisplayMode
-        _videoPlayerForceAudioSoftDecode = Configs.videoPlayerForceAudioSoftDecode
+        _videoPlayerForceAudioSoftDecode = Configs.videoPlayerForceSoftDecode
         _videoPlayerRenderMode = Configs.videoPlayerRenderMode
         _videoPlayerSkipMultipleFramesOnSameVSync = Configs.videoPlayerSkipMultipleFramesOnSameVSync
     }

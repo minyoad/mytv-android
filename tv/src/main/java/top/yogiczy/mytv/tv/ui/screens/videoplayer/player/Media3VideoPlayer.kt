@@ -41,7 +41,7 @@ class Media3VideoPlayer(
     private val videoPlayer by lazy {
         val renderersFactory = DefaultRenderersFactory(context)
             .setExtensionRendererMode(
-                if (Configs.videoPlayerForceAudioSoftDecode)
+                if (Configs.videoPlayerForceSoftDecode)
                     DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
                 else DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
             )

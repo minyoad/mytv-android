@@ -50,6 +50,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+
+            <intent-filter>
+                <action android:name="top.yogiczy.mytv.tv.RESTART_PLAY"/>
+            </intent-filter>
         </activity>
 
         <receiver

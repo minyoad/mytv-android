@@ -392,7 +392,7 @@ object Configs {
         set(value) = SP.putInt(KEY.VIDEO_PLAYER_DISPLAY_MODE.name, value.value)
 
     /** 播放器 强制音频软解 */
-    var videoPlayerForceAudioSoftDecode: Boolean
+    var videoPlayerForceSoftDecode: Boolean
         get() = SP.getBoolean(KEY.VIDEO_PLAYER_FORCE_AUDIO_SOFT_DECODE.name, false)
         set(value) = SP.putBoolean(KEY.VIDEO_PLAYER_FORCE_AUDIO_SOFT_DECODE.name, value)
 

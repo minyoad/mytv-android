@@ -12,6 +12,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine   // 1. 新增
+import androidx.compose.ui.platform.LocalContext          // 2. 新增
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
+import androidx.core.content.ContextCompat
 import top.yogiczy.mytv.core.data.entities.channel.Channel
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelIdx
@@ -38,6 +45,7 @@ class MainContentState(
     private val videoPlayerState: VideoPlayerState,
     private val channelGroupListProvider: () -> ChannelGroupList = { ChannelGroupList() },
     private val settingsViewModel: SettingsViewModel,
+    private val context: Context,
 ) : Loggable() {
     private var _currentChannel by mutableStateOf(Channel())
     val currentChannel get() = _currentChannel
@@ -110,6 +118,28 @@ class MainContentState(
         changeCurrentChannel(channelGroupList.channelList.getOrElse(settingsViewModel.iptvLastChannelIdx) {
             channelGroupList.channelList.firstOrNull() ?: Channel()
         })
+
+        /* 新增：监听 RESTART_PLAY 广播，收到后重新 prepare 当前频道 */
+        coroutineScope.launch {
+            suspendCancellableCoroutine<Unit> { cont ->
+                val receiver = object : BroadcastReceiver() {
+                    override fun onReceive(ctx: Context, intent: Intent) {
+                        if (intent.action == "top.yogiczy.mytv.tv.RESTART_PLAY") {
+                            changeCurrentChannel(_currentChannel, _currentChannelUrlIdx, _currentPlaybackEpgProgramme)
+                        }
+                    }
+                }
+                val filter = IntentFilter("top.yogiczy.mytv.tv.RESTART_PLAY")
+                ContextCompat.registerReceiver(
+                    context,
+                    receiver,
+                    filter,
+                    ContextCompat.RECEIVER_NOT_EXPORTED
+                )
+                cont.invokeOnCancellation { context.unregisterReceiver(receiver) }
+                // 永久挂起，直到作用域被取消
+            }
+        }
 
         videoPlayerState.onReady {
             settingsViewModel.iptvPlayableHostList += getUrlHost(_currentChannel.urlList[_currentChannelUrlIdx])
@@ -316,13 +346,17 @@ fun rememberMainContentState(
     videoPlayerState: VideoPlayerState = rememberVideoPlayerState(),
     channelGroupListProvider: () -> ChannelGroupList = { ChannelGroupList() },
     settingsViewModel: SettingsViewModel = viewModel(),
-) = remember {
-    MainContentState(
-        coroutineScope = coroutineScope,
-        videoPlayerState = videoPlayerState,
-        channelGroupListProvider = channelGroupListProvider,
-        settingsViewModel = settingsViewModel,
-    )
+):MainContentState {
+    val context = LocalContext.current.applicationContext  // 先在Composable体内获取context
+    return remember {
+        MainContentState(
+            coroutineScope = coroutineScope,
+            videoPlayerState = videoPlayerState,
+            channelGroupListProvider = channelGroupListProvider,
+            settingsViewModel = settingsViewModel,
+            context = context,  // 传递context
+        )
+    }
 }
 
 private fun getUrlHost(url: String): String {

@@ -17,12 +17,14 @@ import top.yogiczy.mytv.tv.ui.screens.components.SelectDialog
 import top.yogiczy.mytv.tv.ui.screens.settings.SettingsViewModel
 import top.yogiczy.mytv.tv.ui.screens.videoplayerdiaplaymode.VideoPlayerDisplayModeScreen
 import top.yogiczy.mytv.tv.ui.utils.Configs
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun SettingsCategoryVideoPlayer(
     modifier: Modifier = Modifier,
     settingsViewModel: SettingsViewModel = viewModel(),
 ) {
+    val context = LocalContext.current
     SettingsContentList(modifier) {
         item {
             SettingsListItem(
@@ -42,13 +44,14 @@ fun SettingsCategoryVideoPlayer(
 
         item {
             SettingsListItem(
-                headlineContent = "强制音频软解",
+                headlineContent = "强制软解",
+                supportingContent = "对于Media3，使音频强制软解\n对于IJK，将禁用MediaCodec解码（使用ffmpeg）",
                 trailingContent = {
-                    Switch(settingsViewModel.videoPlayerForceAudioSoftDecode, null)
+                    Switch(settingsViewModel.videoPlayerForceSoftDecode, null)
                 },
                 onSelected = {
-                    settingsViewModel.videoPlayerForceAudioSoftDecode =
-                        !settingsViewModel.videoPlayerForceAudioSoftDecode
+                    settingsViewModel.videoPlayerForceSoftDecode =
+                        !settingsViewModel.videoPlayerForceSoftDecode
                 },
             )
         }
@@ -147,16 +150,19 @@ fun SettingsCategoryVideoPlayer(
                     } else {
                         Configs.VideoPlayerType.IJK
                     }
+
+                    // 立即重启当前播放，让新引擎生效
+                    context.sendBroadcast(android.content Intent("top.yogiczy.mytv.tv.RESTART_PLAY"))
                 },
             )
         }
 
-        item {
-            SettingsListItem(
-                headlineContent = "播放器自定义UA",
-                supportingContent = settingsViewModel.videoPlayerUserAgent,
-                remoteConfig = true,
-            )
-        }
+//        item {
+//            SettingsListItem(
+//                headlineContent = "播放器自定义UA",
+//                supportingContent = settingsViewModel.videoPlayerUserAgent,
+//                remoteConfig = true,
+//            )
+//        }
     }
 }

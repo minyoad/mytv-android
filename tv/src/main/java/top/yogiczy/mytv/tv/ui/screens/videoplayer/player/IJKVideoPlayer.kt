@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import tv.danmaku.ijk.media.player.IMediaPlayer
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
 import top.yogiczy.mytv.core.data.utils.Logger
+import top.yogiczy.mytv.tv.ui.utils.Configs
 
 class IJKVideoPlayer(
     private val context: Context,
@@ -24,52 +25,57 @@ class IJKVideoPlayer(
     private var currentUrl: String? = null
     private var retryCount = 0
     private val MAX_RETRY_COUNT = 3
-    
+
     private val ijkPlayer by lazy {
         IjkMediaPlayer().apply {
-            // 基础播放器配置
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0) // 禁用硬解码
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 0) // 禁用硬解码自动旋转
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 0) // 禁用硬解码分辨率变化处理
+            //            IjkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_INFO)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 1)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", 0)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "http-detect-range-support", 0)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 2)
+            setOption(
+                IjkMediaPlayer.OPT_CATEGORY_FORMAT,
+                "timeout",
+                Configs.videoPlayerLoadTimeout
+            )
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 100L)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 1)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024 * 10)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "fastseek")
+        }
+    }
+
+    private fun setOption() {
+        ijkPlayer.apply {
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "allowed_extensions", "ALL")
+            if (Configs.videoPlayerForceSoftDecode)
+                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0)
+            else{
+                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1)
+                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-all-videos", 1)
+                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-hevc", 1)
+                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1)
+            }
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "crypto,file,http,https,tcp,tls,udp,rtmp,rtsp")
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 0)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "fast", 1)
             setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 1)
-            
-            // Seek优化配置
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "enable-accurate-seek", 1) // 启用精确seek
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "seek-at-start", 0) // 禁用启动时seek
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer") // 禁用文件缓冲，减少seek延迟
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "enable-seek-forward", 1) // 启用向前seek优化
-            
-            // RTSP协议支持和优化
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "rtsp,http,https,tcp,tls,udp")
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "enable-accurate-seek", 1)
+
+            // rtsp设置 https://ffmpeg.org/ffmpeg-protocols.html#rtsp
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_transport", "tcp")
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_flags", "prefer_tcp")
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "stimeout", 30000000) // RTSP超时设置为30秒
-            
-            // 网络和缓冲优化
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 1)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "buffer_size", 1024 * 1024) // 降低缓冲区到1MB以减少seek延迟
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0) // 禁用包缓冲以减少seek延迟
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max_delay", 100) // 降低最大延迟到100ms
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 0) // 禁用无限缓冲
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 1000) // 降低分析时长到1000ms
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024 * 1024) // 降低探测大小到1MB
-            
-            // H.264解码优化
-            setOption(IjkMediaPlayer.OPT_CATEGORY_CODEC, "skip_loop_filter", 48) // 跳过循环滤波以提高性能
-            setOption(IjkMediaPlayer.OPT_CATEGORY_CODEC, "skip_frame", 0) // 不跳帧
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5) // 允许更多丢帧以保持流畅
-            setOption(IjkMediaPlayer.OPT_CATEGORY_CODEC, "threads", "auto") // 自动选择解码线程数
-            
-            // 错误恢复和容错
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "sync-av-start", 0) // 关闭音视频同步等待
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "safe", 0) // 不安全模式，提高兼容性
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "reconnect_at_eof", 1) // 文件结束时重连
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_streamed", 1) // 流媒体断开自动重连
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_delay_max", 4000) // 最大重连延迟4秒
-            
-            // 音频处理
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 1) // 使用OpenSL ES
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "overlay-format", IjkMediaPlayer.SDL_FCC_RV32.toLong())
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "buffer_size", 1316)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 1)  // 无限读
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "flush_packets", 1L)
+
+            //  关闭播放器缓冲，这个必须关闭，否则会出现播放一段时间后，一直卡住，控制台打印 FFP_MSG_BUFFERING_START
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0)
+
+            //https://www.cnblogs.com/Fitz/p/18537127
+            // setOption(IjkMediaPlayer.OPT_CATEGORY_CODEC, "skip_loop_filter",0) //丢弃一些“无用”的数据包，例如AVI格式中的零大小数据包
+            // setOption(IjkMediaPlayer.OPT_CATEGORY_CODEC, "skip_frame", 0) //不跳帧，解码所有帧
         }
     }
     
@@ -106,6 +112,15 @@ class IJKVideoPlayer(
         
         override fun onError(mp: IMediaPlayer?, what: Int, extra: Int): Boolean {
             log.e("onError what=$what extra=$extra")
+            // -110 ETIMEDOUT  -138 ENOSYS  均做二次重试
+            if ((what == -110 || what == -138) && retryCount < MAX_RETRY_COUNT) {
+                retryCount++
+                coroutineScope.launch {
+                    delay(1500 * retryCount.toLong())
+                    currentUrl?.let { prepare(it) }
+                }
+                return true   // 自己消化掉，不抛到 UI 层
+            }
             triggerError(PlaybackException("IJKPlayerError", what))
             return true
         }
@@ -151,7 +166,10 @@ class IJKVideoPlayer(
             if (currentSurface != null) {
                 ijkPlayer.setSurface(currentSurface)
             }
-            ijkPlayer.setDataSource(context, Uri.parse(url))
+            /* 关键：不要带任何自定义头，防止服务器拒SETUP */
+            val headers = emptyMap<String, String>()   // ← 空 map，让 FFmpeg 走原生流程
+            ijkPlayer.setDataSource(context, Uri.parse(url), headers)
+            setOption()
             ijkPlayer.prepareAsync()
             retryCount = 0
         } catch (e: Exception) {
@@ -187,7 +205,15 @@ class IJKVideoPlayer(
     }
 
     override fun seekTo(position: Long) {
-        ijkPlayer.seekTo(position)
+//        ijkPlayer.seekTo(position)
+        // 对于直播流（duration <= 0），seek操作不仅无效，还可能导致播放器状态异常。
+        // 增加保护，只对点播视频执行seek。
+        if (ijkPlayer.duration > 0) {
+            log.d("Seeking to $position")
+            ijkPlayer.seekTo(position)
+        } else {
+            log.w("Seek is ignored for live streams.")
+        }
     }
 
     override fun stop() {
