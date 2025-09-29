@@ -39,9 +39,11 @@ jobs:
 
       - name: Commit and push changes
         run: |
+          cd json-repo
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add json-repo/tv-stable.json  # 更新为目标 JSON 文件路径
+          git add tv-stable.json  # 更新为目标 JSON 文件路径
           git commit -m "Update release information for ${RELEASE_TAG}"
           git push
+
 
