@@ -60,7 +60,6 @@ class EpgRepository(
             }
         }
 
-        // 定义时间格式,年份-月份-日期 小时:分钟
         val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
 
         while (parser.next() != XmlPullParser.END_DOCUMENT) {
@@ -71,6 +70,7 @@ class EpgRepository(
                             currentChannelId = parser.getAttributeValue(null, "id")
                             parser.nextTag()
                             val channelName = getSafeText()
+//                            log.d("解析频道: id=$currentChannelId, name=$channelName")  // 添加日志
 
                             if (lowerFilteredChannels.isEmpty() ||
                                 channelName.lowercase() in lowerFilteredChannels) {
@@ -83,20 +83,25 @@ class EpgRepository(
                             val stopTime = parser.getAttributeValue(null, "stop")
                             parser.nextTag()
                             val title = getSafeText()
+                            log.i("解析节目: channelId=$channelId, start=$startTime, stop=$stopTime, title=$title")  // 添加日志
 
                             epgMap[channelId]?.let { epg ->
+                                val startAt = dateFormat.parse(startTime)?.time ?: 0
+                                val endAt = dateFormat.parse(stopTime)?.time ?: 0
+                                if (startAt == 0L || endAt == 0L) {
+                                    log.w("节目时间解析失败: start=$startTime, stop=$stopTime")
+                                }
+
                                 val newProgramme = EpgProgramme(
-                                    startAt = dateFormat.parse(startTime)?.time ?: 0,
-                                    endAt = dateFormat.parse(stopTime)?.time ?: 0,
+                                    startAt = startAt,
+                                    endAt = endAt,
                                     title = title
                                 )
 
-                                // 添加去重检查：开始时间相同的节目不重复添加
+                                // 检查是否已存在相同时间的节目或者开始时间在其他节目结束时间之前
                                 val isDuplicate = epg.programmeList.any { prog ->
-                                    timeFormat.format(prog.startAt) == timeFormat.format(newProgramme.startAt)
-//                                    prog.title == newProgramme.title &&
-//                                            prog.startAt == newProgramme.startAt &&
-//                                            prog.endAt == newProgramme.endAt
+                                    timeFormat.format(prog.startAt) == timeFormat.format(newProgramme.startAt) ||
+                                            newProgramme.startAt < prog.endAt && newProgramme.endAt > prog.startAt
                                 }
 
                                 if (!isDuplicate) {
@@ -106,6 +111,8 @@ class EpgRepository(
                                 } else {
                                     log.d("发现重复节目: ${newProgramme.title} (${timeFormat.format(newProgramme.startAt)})")
                                 }
+                            } ?: run {
+//                                log.w("节目所属频道未找到: channelId=$channelId")
                             }
                         }
                     }
@@ -137,15 +144,16 @@ class EpgRepository(
         refreshTimeThreshold: Int,
     ): EpgList = withContext(Dispatchers.Default) {
         try {
-            if (Calendar.getInstance().get(Calendar.HOUR_OF_DAY) < refreshTimeThreshold) {
-                log.i("未到时间点，不刷新节目单")
-                return@withContext EpgList()
-            }
+//            if (Calendar.getInstance().get(Calendar.HOUR_OF_DAY) < refreshTimeThreshold) {
+//                log.i("未到时间点，不刷新节目单")
+//                return@withContext EpgList()
+//            }
 
             val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-            val xmlJson = getOrRefresh({ lastModified, _ ->
-                dateFormat.format(System.currentTimeMillis()) != dateFormat.format(lastModified)
+            val xmlJson = getOrRefresh({ lastModified, cachedContent ->
+                // 如果缓存为空，强制刷新；或者日期不一致也刷新
+                cachedContent.isNullOrEmpty() ||dateFormat.format(System.currentTimeMillis()) != dateFormat.format(lastModified)
             }) {
                 val xmlString = epgXmlRepository.getEpgXml().removeBom()
                 Json.encodeToString(

@@ -41,6 +41,11 @@ object Constants {
                 name = "默认直播源 yuanzl77（IPV4/IPV6）",
                 url = GITHUB_PROXY+"https://raw.githubusercontent.com/yuanzl77/IPTV/main/live.m3u",
             ),
+            IptvSource(
+                name = "默认直播源-电影列表",
+//                url = "https://iptv-cdn.mybacc.com/list/movices.txt",
+                url = GITHUB_PROXY+"https://raw.githubusercontent.com/minyoad/my-iptv/refs/heads/master/list/movies.txt",
+            ),
         )
     )
 
@@ -68,7 +73,8 @@ object Constants {
             ),
             EpgSource(
                 name = "默认节目单 mybacc 备用",
-                url = "https://iptv-cdn.mybacc.com/epg/e.xml.gz",
+//                url = "https://iptv-cdn.mybacc.com/epg/e.xml.gz",
+                url = GITHUB_PROXY+"https://raw.githubusercontent.com/minyoad/my-iptv/refs/heads/master/epg/e.xml.gz",
             ),
         )
     )
