@@ -120,6 +120,15 @@ class EpgRepository(
         EpgList(epgMap.values.toList())
     }
 
+    // Add this helper function to your project
+    fun String.removeBom(): String {
+        val bom = "\uFEFF"
+        if (this.startsWith(bom)) {
+            return this.removePrefix(bom)
+        }
+        return this
+    }
+
     /**
      * 获取节目单列表
      */
@@ -138,7 +147,7 @@ class EpgRepository(
             val xmlJson = getOrRefresh({ lastModified, _ ->
                 dateFormat.format(System.currentTimeMillis()) != dateFormat.format(lastModified)
             }) {
-                val xmlString = epgXmlRepository.getEpgXml()
+                val xmlString = epgXmlRepository.getEpgXml().removeBom()
                 Json.encodeToString(
                     parseFromXml(
                         xmlString,
