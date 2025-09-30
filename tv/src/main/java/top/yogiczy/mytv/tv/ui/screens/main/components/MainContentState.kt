@@ -156,7 +156,13 @@ class MainContentState(
         }
 
         videoPlayerState.onError {
-            if (_currentPlaybackEpgProgramme != null) return@onError
+            if (_currentPlaybackEpgProgramme != null) {
+                // 回放播放错误时，切换到直播
+                if (_currentChannelUrlIdx < _currentChannel.urlList.size - 1) {
+                    changeCurrentChannel(_currentChannel, _currentChannelUrlIdx)
+                }
+                return@onError
+            }
 
             settingsViewModel.iptvPlayableHostList -= getUrlHost(_currentChannel.urlList[_currentChannelUrlIdx])
 
@@ -276,7 +282,7 @@ class MainContentState(
                 timeFormat.format(_currentPlaybackEpgProgramme!!.endAt),
             ).joinToString("")
             url = if (URI(url).query.isNullOrBlank()) "$url?$query" else "$url&$query"
-            url = ChannelUtil.urlToCanPlayback(url)
+//            url = ChannelUtil.urlToCanPlayback(url) //电信RTSP不需要替换
         }
 
         log.d("播放${_currentChannel.name}（${_currentChannelUrlIdx + 1}/${_currentChannel.urlList.size}）: $url")

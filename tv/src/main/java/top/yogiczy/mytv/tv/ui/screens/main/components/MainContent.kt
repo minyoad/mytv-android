@@ -74,7 +74,12 @@ fun MainContent(
     Box(
         modifier = modifier
             .popupable()
-            .captureBackKey { onBackPressed() }
+            .captureBackKey {
+                if(mainContentState.currentPlaybackEpgProgramme!=null){
+                    mainContentState.changeCurrentChannel(mainContentState.currentChannel)
+                }
+                else onBackPressed()
+            }
             .handleKeyEvents(
                 onUp = {
                     if (settingsViewModel.iptvChannelChangeFlip) mainContentState.changeCurrentChannelToNext()
