@@ -7,6 +7,9 @@ object IdGenerator {
     private val counter = AtomicInteger(-1)
 
     fun generateId(): String = counter.incrementAndGet().toString()
+
+    /** 强制提前初始化，保证单例在 Application 阶段就建好 */
+    fun init() { /* no-op */ }
 }
 /**
  * 频道
@@ -14,7 +17,7 @@ object IdGenerator {
 @Immutable
 data class Channel(
     /**
-     * 直播源ID
+     * 频道ID
      */
     val id: String = IdGenerator.generateId(), // 使用序号生成 ID
     /**
