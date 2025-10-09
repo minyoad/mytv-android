@@ -230,9 +230,15 @@ class IJKVideoPlayer(
             override fun surfaceCreated(holder: SurfaceHolder) {
                 currentSurface = holder.surface
                 ijkPlayer.setDisplay(holder)
+                // Resume playback when the surface is available again
+                play()
             }
             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
             override fun surfaceDestroyed(holder: SurfaceHolder) {
+                // Pause playback when the surface is destroyed
+                pause()
+                ijkPlayer.setSurface(null)
+                currentSurface?.release()
                 currentSurface = null
             }
         })
@@ -244,13 +250,23 @@ class IJKVideoPlayer(
             override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
                 currentSurface = Surface(surface)
                 ijkPlayer.setSurface(currentSurface)
+                play()
             }
             override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {}
             override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+                pause()
+                ijkPlayer.setSurface(null)
+                currentSurface?.release()
                 currentSurface = null
                 return true
             }
             override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
+        }
+
+        if (textureView.isAvailable) {
+            val newSurface = Surface(textureView.surfaceTexture)
+            currentSurface = newSurface
+            ijkPlayer.setSurface(newSurface)
         }
     }
 }
