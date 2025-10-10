@@ -4,10 +4,13 @@ on:
   push:
     tags:
       - 'v*'          # 推送以 v 开头的标签时触发
+  workflow_dispatch:   # 支持手动触发
 
 jobs:
   build_apk:
     runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       # 1. 检出当前仓库源码
       - name: Checkout source
@@ -18,7 +21,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: '11'
+          java-version: '17'
 
       # 3. 赋予 Gradle 可执行权限（Linux  runner 需要）
       - name: Grant execute permission for gradlew
@@ -37,15 +40,65 @@ jobs:
       - name: Build Release APK
         run: ./gradlew assembleRelease
 
-      # 5. 将 APK 上传为 Release 附件
+      # ----------------------------------------------------------
+      #  根据 build.gradle.kts 生成的文件名定位 APK
+      # ----------------------------------------------------------
+      - name: Locate APK
+        id: apk
+        run: |
+          # 文件名格式：mytv-android-tv-<ver>-<abi>-sdk<minSdk>.apk
+          apk_path=$(find tv/build/outputs/apk/release -name 'mytv-android-tv-*.apk' | head -n1)
+          [ -z "$apk_path" ] && { echo "❌ APK not found"; exit 1; }
+          echo "apk_path=$apk_path" >> $GITHUB_OUTPUT
+
+      # ----------------------------------------------------------
+      #  0. 先拿到或创建 Release，保证 upload_url 存在
+      # ----------------------------------------------------------
+      - name: Create/Find Release
+        id: release
+        shell: bash
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            resp=$(curl -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              https://api.github.com/repos/${{ github.repository }}/releases \
+              -d "{
+                \"tag_name\": \"$tag\",
+                \"name\": \"$tag\",
+                \"draft\": false,
+                \"prerelease\": false
+              }")
+          else
+            resp=$(curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag)
+          fi
+          upload_url=$(echo "$resp" | jq -r .upload_url | sed 's/{.*}//')
+          # 若仍为空则主动失败
+          [[ -z "$upload_url" || "$upload_url" == "null" ]] && { echo "❌ Failed to get upload_url"; exit 1; }
+          echo "upload_url=$upload_url" >> $GITHUB_OUTPUT
+          echo "tag_name=$tag" >> $GITHUB_OUTPUT
+
+      # ----------------------------------------------------------
+      #  1. 再定位 APK
+      # ----------------------------------------------------------
+      - name: Locate APK
+        id: apk
+        run: |
+          apk_path=$(find tv/build/outputs/apk/release -name 'mytv-android-tv-*.apk' | head -n1)
+          [ -z "$apk_path" ] && { echo "❌ APK not found"; exit 1; }
+          echo "apk_path=$apk_path" >> $GITHUB_OUTPUT
+
+      # 5. 上传 APK 到 Release
       - name: Upload APK to Release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: app/build/outputs/apk/release/app-release.apk
-          asset_name: app-release-${{ github.event.release.tag_name }}.apk
+          upload_url: ${{ steps.release.outputs.upload_url }}   # 必须来自同 job 的 steps.release
+          asset_path: ${{ steps.apk.outputs.apk_path }}
+          asset_name: app-release-${{ steps.release.outputs.tag_name }}.apk
           asset_content_type: application/vnd.android.package-archive
 
   update_json:
@@ -63,8 +116,9 @@ jobs:
       - name: Get release information
         id: get_release_info
         run: |
-          echo "RELEASE_TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
-          echo "APK_URL=${{ github.event.release.assets[0].browser_download_url }}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=${{ needs.build_apk.outputs.tag_name }}" >> $GITHUB_ENV
+          echo "APK_URL=https://github.com/${{ github.repository }}/releases/download/${{ needs.build_apk.outputs.tag_name }}/app-release-${{ needs.build_apk.outputs.tag_name }}.apk" >> $GITHUB_ENV
+          echo "RELEASE_BODY=" >> $GITHUB_ENV   # 手动触发时暂无 body，留空即可
           BODY_ESCAPED=$(echo "$BODY" | sed ':a;N;$!ba;s/\n/\\n/g')
           echo "RELEASE_BODY=$BODY_ESCAPED" >> $GITHUB_ENV
 
@@ -89,5 +143,6 @@ jobs:
           git add tv-stable.json
           git commit -m "Update release information for ${RELEASE_TAG}"
           git push
+
 
 
