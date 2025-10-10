@@ -1,32 +1,76 @@
 name: Release APK
 
 on:
-  release:
-    types: [published]  # 监听发布事件
+  push:
+    tags:
+      - 'v*'          # 推送以 v 开头的标签时触发
 
 jobs:
-  update_json:
+  build_apk:
     runs-on: ubuntu-latest
-
     steps:
+      # 1. 检出当前仓库源码
+      - name: Checkout source
+        uses: actions/checkout@v3
+
+      # 2. 配置 JDK 11（按需改成你项目需要的版本）
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      # 3. 赋予 Gradle 可执行权限（Linux  runner 需要）
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      # 3. 导入签名密钥
+      - name: Decode signing key
+        run: |
+          echo "${{ secrets.SIGNING_KEYSTORE_B64 }}" | base64 -d > release.keystore
+          echo "RELEASE_STORE_FILE=${{ github.workspace }}/release.keystore" >> $GITHUB_ENV
+          echo "RELEASE_KEY_ALIAS=${{ secrets.SIGNING_ALIAS }}" >> $GITHUB_ENV
+          echo "RELEASE_STORE_PASSWORD=${{ secrets.SIGNING_STORE_PWD }}" >> $GITHUB_ENV
+          echo "RELEASE_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PWD }}" >> $GITHUB_ENV
+
+      # 4. 编译 Release APK（签名已自动生效）
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+
+      # 5. 将 APK 上传为 Release 附件
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: app/build/outputs/apk/release/app-release.apk
+          asset_name: app-release-${{ github.event.release.tag_name }}.apk
+          asset_content_type: application/vnd.android.package-archive
+
+  update_json:
+    needs: build_apk          # 等待 build_apk 完成
+    runs-on: ubuntu-latest
+    steps:
+      # 以下保持你原来的 JSON 更新逻辑即可
       - name: Checkout the repository with the JSON file
         uses: actions/checkout@v2
         with:
-          repository: minyoad/mytv-android-update  # 替换为目标仓库
+          repository: minyoad/mytv-android-update
           token: ${{ secrets.GITHUB_TOKEN }}
-          path: json-repo  # 将目标仓库检出到 json-repo 文件夹
+          path: json-repo
 
       - name: Get release information
         id: get_release_info
         run: |
           echo "RELEASE_TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
-          echo "APK_URL=${{ github.event.release.assets[0].browser_download_url }}" >> $GITHUB_ENV  # 获取 APK 下载链接
+          echo "APK_URL=${{ github.event.release.assets[0].browser_download_url }}" >> $GITHUB_ENV
           BODY_ESCAPED=$(echo "$BODY" | sed ':a;N;$!ba;s/\n/\\n/g')
           echo "RELEASE_BODY=$BODY_ESCAPED" >> $GITHUB_ENV
 
       - name: Update JSON file
         run: |
-          JSON_FILE=json-repo/tv-stable.json  # 更新为目标 JSON 文件路径
+          JSON_FILE=json-repo/tv-stable.json
           jq --arg tag "$RELEASE_TAG" \
              --arg url "$APK_URL" \
              --arg body "$RELEASE_BODY" \
@@ -42,7 +86,7 @@ jobs:
           cd json-repo
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add tv-stable.json  # 更新为目标 JSON 文件路径
+          git add tv-stable.json
           git commit -m "Update release information for ${RELEASE_TAG}"
           git push
 
