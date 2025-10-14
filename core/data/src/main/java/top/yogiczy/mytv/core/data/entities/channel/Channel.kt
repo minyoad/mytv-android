@@ -42,7 +42,7 @@ data class Channel(
 ) {
     companion object {
         val EXAMPLE = Channel(
-            name = "CCTV-1 法治与法治",
+            name = "CCTV-1 综合",
             epgName = "cctv1",
             urlList = listOf(
                 "http://dbiptv.sn.chinamobile.com/PLTV/88888890/224/3221226231/index.m3u8",

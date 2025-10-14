@@ -6,6 +6,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -134,12 +135,24 @@ private fun ChannelItemContent(
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.SpaceAround,
     ) {
-        Text(
-            channel.name,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
+        Row(
             modifier = Modifier.ifElse(isFocused, Modifier.basicMarquee()),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "${channel.id}",
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                modifier = Modifier.alpha(0.8f).padding(end = 6.dp),
+            )
+
+            Text(
+                channel.name,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+            )
+
+        }
         Text(
             recentEpgProgramme?.now?.title ?: "",
             style = MaterialTheme.typography.labelSmall,
