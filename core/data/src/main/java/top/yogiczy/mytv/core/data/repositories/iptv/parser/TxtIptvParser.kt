@@ -6,6 +6,7 @@ import top.yogiczy.mytv.core.data.entities.channel.Channel
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroup
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelList
+import top.yogiczy.mytv.core.data.utils.Constants
 
 /**
  * txt直播源解析
@@ -49,7 +50,8 @@ class TxtIptvParser : IptvParser {
                         name = nameEntry.key,
                         epgName = nameEntry.value.first().channelName,
                         urlList = nameEntry.value.map { it.url }.distinct(),
-                        logo = "https://live.fanmingming.com/tv/${nameEntry.value.first().channelName}.png"
+                        logo = Constants.CHANNEL_LOGO_SOURCE+"${nameEntry.value.first().channelName}"
+//                        logo = "https://live.fanmingming.com/tv/${nameEntry.value.first().channelName}.png"
                     )
                 }),
             )

@@ -80,6 +80,11 @@ object Constants {
     )
 
     /**
+     * 频道logo来源
+     */
+    val CHANNEL_LOGO_SOURCE="https://iptv.mybacc.com/logo?ch="
+
+    /**
      * 节目单刷新时间阈值（小时）
      */
     const val EPG_REFRESH_TIME_THRESHOLD = 2 // 不到2点不刷新
