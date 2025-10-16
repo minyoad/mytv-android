@@ -5,12 +5,25 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
+import top.yogiczy.mytv.core.data.entities.channel.ChannelList
 import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSource
 import top.yogiczy.mytv.core.data.network.await
 import top.yogiczy.mytv.core.data.repositories.FileCacheRepository
 import top.yogiczy.mytv.core.data.repositories.iptv.parser.IptvParser
 import top.yogiczy.mytv.core.data.utils.Logger
 
+
+class IdGenerator {
+    private var currentId = 0
+
+    fun nextId(): Int {
+        return ++currentId
+    }
+
+    fun reset() {
+        currentId = 0
+    }
+}
 /**
  * 直播源数据获取
  */
@@ -22,6 +35,8 @@ class IptvRepository(
     source.isLocal,
 ) {
     private val log = Logger.create(javaClass.simpleName)
+
+    private val idGenerator = IdGenerator()
 
     /**
      * 获取直播源数据
@@ -58,6 +73,15 @@ class IptvRepository(
             val parser = IptvParser.instances.first { it.isSupport(source.url, sourceData) }
             val startTime = System.currentTimeMillis()
             val groupList = parser.parse(sourceData)
+
+            // 在获取到频道列表后，统一生成频道id
+            idGenerator.reset()
+            val groupListWithIds = ChannelGroupList(groupList.map { group ->
+                group.copy(channelList = ChannelList(group.channelList.map { channel ->
+                    channel.copy(id = idGenerator.nextId().toString())
+                }))
+            })
+
             log.i(
                 listOf(
                     "解析直播源（${source.name}）完成：${groupList.size}个分组",
@@ -67,7 +91,7 @@ class IptvRepository(
                 ).joinToString()
             )
 
-            return groupList
+            return groupListWithIds
         } catch (ex: Exception) {
             log.e("获取直播源失败", ex)
             throw Exception(ex)

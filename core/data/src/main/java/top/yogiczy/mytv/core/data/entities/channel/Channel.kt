@@ -3,14 +3,6 @@ package top.yogiczy.mytv.core.data.entities.channel
 import androidx.compose.runtime.Immutable
 import java.util.concurrent.atomic.AtomicInteger
 
-object IdGenerator {
-    private val counter = AtomicInteger(-1)
-
-    fun generateId(): String = counter.incrementAndGet().toString()
-
-    /** 强制提前初始化，保证单例在 Application 阶段就建好 */
-    fun init() { /* no-op */ }
-}
 /**
  * 频道
  */
@@ -19,7 +11,7 @@ data class Channel(
     /**
      * 频道ID
      */
-    val id: String = IdGenerator.generateId(), // 使用序号生成 ID
+    val id: String = "0", // 使用序号生成 ID
     /**
      * 频道名称
      */
@@ -42,6 +34,7 @@ data class Channel(
 ) {
     companion object {
         val EXAMPLE = Channel(
+            id = "1",
             name = "CCTV-1 综合",
             epgName = "cctv1",
             urlList = listOf(

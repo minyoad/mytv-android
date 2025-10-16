@@ -83,7 +83,7 @@ class EpgRepository(
                             val stopTime = parser.getAttributeValue(null, "stop")
                             parser.nextTag()
                             val title = getSafeText()
-                            log.i("解析节目: channelId=$channelId, start=$startTime, stop=$stopTime, title=$title")  // 添加日志
+//                            log.i("解析节目: channelId=$channelId, start=$startTime, stop=$stopTime, title=$title")  // 添加日志
 
                             epgMap[channelId]?.let { epg ->
                                 val startAt = dateFormat.parse(startTime)?.time ?: 0

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,12 +27,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -258,15 +257,7 @@ private fun ClassicChannelItem(
                 headlineContent = {
                     Row{
                         Text(text = channel.id, maxLines = 1,
-                            modifier = Modifier.padding(top = 4.dp))
-                        Box(modifier = Modifier.padding(horizontal = 4.dp)) {
-                            Spacer(
-                                modifier = Modifier
-                                    .background(Color.White)
-                                // .width(1.dp)
-                                // .height(20.dp),
-                            )
-                        }
+                            modifier = Modifier.alpha(0.9f).padding(top=3.dp,end = 6.dp))
                         Text(
                             channel.name,
                             maxLines = 1,

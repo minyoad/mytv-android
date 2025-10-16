@@ -43,8 +43,8 @@ object Constants {
             ),
             IptvSource(
                 name = "默认直播源-电影列表",
-//                url = "https://iptv-cdn.mybacc.com/list/movices.txt",
-                url = GITHUB_PROXY+"https://raw.githubusercontent.com/minyoad/my-iptv/refs/heads/master/list/movies.txt",
+                url = "https://iptv-cdn.mybacc.com/list/movies.txt",
+//                url = GITHUB_PROXY+"https://raw.githubusercontent.com/minyoad/my-iptv/refs/heads/master/list/movies.txt",
             ),
         )
     )
