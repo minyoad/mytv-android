@@ -48,9 +48,28 @@ jobs:
           echo "RELEASE_STORE_PASSWORD=${{ secrets.SIGNING_STORE_PWD }}" >> $GITHUB_ENV
           echo "RELEASE_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PWD }}" >> $GITHUB_ENV
 
+      - name: Verify keystore & env
+        run: |
+          echo "📦  Keystore MD5:"
+          md5sum release.keystore
+          echo "🔑  Env vars (值已打码):"
+          echo "RELEASE_STORE_FILE=$RELEASE_STORE_FILE"
+          echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS"
+          echo "RELEASE_STORE_PASSWORD=${RELEASE_STORE_PASSWORD:0:2}***"
+          echo "RELEASE_KEY_PASSWORD=${RELEASE_KEY_PASSWORD:0:2}***"
+
       # 4. 编译 Release APK（签名已自动生效）
       - name: Build Release APK
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease --info
+
+      # ✅ 新增：验证 APK 是否已签名
+      - name: Check APK signature
+        run: |
+          find tv/build/outputs/apk/release -name 'mytv-android-tv-*.apk' | while read apk; do
+            echo "🔍  Checking $apk"
+            "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner" verify --verbose "$apk"
+            if [ $? -ne 0 ]; then exit 1; fi
+          done
 
       # ----------------------------------------------------------
       #  根据 build.gradle.kts 生成的文件名定位 APK
@@ -63,6 +82,24 @@ jobs:
           [ -z "$apk_path" ] && { echo "❌ APK not found"; exit 1; }
           echo "apk_path=$apk_path" >> $GITHUB_OUTPUT
 
+      - name: Check TAG validity
+        run: |
+          tag="${{ env.TAG }}"
+          # 检查 TAG 是否为空或非法
+          if [[ -z "$tag" || "$tag" == "null" ]]; then
+            echo "❌ TAG is empty or invalid."
+            exit 1
+          fi
+          # 去掉 tag 前后空白字符
+          tag=$(echo "$tag" | xargs)
+          # 可选：只允许 v1.2.3 这类格式
+          if [[ ! "$tag" =~ ^v[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "❌ TAG 格式非法，必须像 v1.2.3"
+            exit 1
+          fi
+          echo "TAG after check: |$tag|"
+          echo "TAG=$tag" >> $GITHUB_ENV
+
       # ----------------------------------------------------------
       #  0. 拿到或创建 Release
       # ----------------------------------------------------------
@@ -70,7 +107,7 @@ jobs:
         id: release
         shell: bash
         run: |
-          tag="${{ env.TAG }}"     # ★ 用统一拿到的 TAG
+          tag="${{ env.TAG }}"
           # 统一先查一次，已存在就复用，否则新建
           resp=$(curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag)
@@ -78,16 +115,19 @@ jobs:
 
           # 如果不存在则新建
           if [[ -z "$upload_url" || "$upload_url" == "null" ]]; then
+            payload="{
+              \"tag_name\": \"$tag\",
+              \"name\": \"$tag\",
+              \"draft\": false,
+              \"prerelease\": false
+            }"
+            echo "Release payload: $payload"
             resp=$(curl -X POST \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               https://api.github.com/repos/${{ github.repository }}/releases \
-              -d "{
-                \"tag_name\": \"$tag\",
-                \"name\": \"$tag\",
-                \"draft\": false,
-                \"prerelease\": false
-              }")
+              -d "$payload")
+            echo "Create release API response: $resp"
             upload_url=$(echo "$resp" | jq -r .upload_url | sed 's/{.*}//')
           fi
 
@@ -108,60 +148,11 @@ jobs:
           echo "apk_path=$apk_path" >> $GITHUB_OUTPUT
           echo "apk_name=$(basename "$apk_path")" >> $GITHUB_OUTPUT
 
-      # 5. 上传 APK 到 Release
-      - name: Upload APK to Release
-        uses: actions/upload-release-asset@v1
+      # 5. 发布到 GitHub Release
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.apk.outputs.apk_path }}
+          tag_name: ${{ steps.release.outputs.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.release.outputs.upload_url }}
-          asset_path: ${{ steps.apk2.outputs.apk_path }}
-          # ★ 用纯文件名
-          asset_name: ${{ steps.apk2.outputs.apk_name }}
-          asset_content_type: application/vnd.android.package-archive
-
-  update_json:
-    needs: build_apk          # 等待 build_apk 完成
-    runs-on: ubuntu-latest
-    steps:
-      # 以下保持你原来的 JSON 更新逻辑即可
-      - name: Checkout the repository with the JSON file
-        uses: actions/checkout@v2
-        with:
-          repository: minyoad/mytv-android-update
-          token: ${{ secrets.GITHUB_TOKEN }}
-          path: json-repo
-
-      - name: Get release information
-        id: get_release_info
-        run: |
-          echo "RELEASE_TAG=${{ needs.build_apk.outputs.tag_name }}" >> $GITHUB_ENV
-          echo "APK_URL=https://github.com/${{ github.repository }}/releases/download/${{ needs.build_apk.outputs.tag_name }}/app-release-${{ needs.build_apk.outputs.tag_name }}.apk" >> $GITHUB_ENV
-          echo "RELEASE_BODY=" >> $GITHUB_ENV   # 手动触发时暂无 body，留空即可
-          BODY_ESCAPED=$(echo "$BODY" | sed ':a;N;$!ba;s/\n/\\n/g')
-          echo "RELEASE_BODY=$BODY_ESCAPED" >> $GITHUB_ENV
-
-      - name: Update JSON file
-        run: |
-          JSON_FILE=json-repo/tv-stable.json
-          jq --arg tag "$RELEASE_TAG" \
-             --arg url "$APK_URL" \
-             --arg body "$RELEASE_BODY" \
-             '{
-               tag_name: $tag,
-               assets: [{ browser_download_url: $url }],
-               body: $body
-             }' \
-             $JSON_FILE > tmp.json && mv tmp.json $JSON_FILE
-
-      - name: Commit and push changes
-        run: |
-          cd json-repo
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add tv-stable.json
-          git commit -m "Update release information for ${RELEASE_TAG}"
-          git push
-
-
-

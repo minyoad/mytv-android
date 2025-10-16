@@ -1,0 +1,90 @@
+name: Update JSON
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  update_json:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout mytv-android-update repository
+        uses: actions/checkout@v3
+        with:
+          repository: minyoad/mytv-android-update
+          token: ${{ secrets.PAT_TOKEN }}
+          fetch-depth: 0
+          path: mytv-android-update
+
+      - name: Get latest release
+        id: latest_release
+        uses: octokit/request-action@v2.x
+        with:
+          route: GET /repos/{owner}/{repo}/releases/latest
+          owner: ${{ github.repository_owner }}
+          repo: ${{ github.event.repository.name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update tv-stable.json
+        id: update_json
+        working-directory: ./mytv-android-update
+        run: |
+          echo "Current working directory: $(pwd)"
+          echo "Directory contents:"
+          ls -la
+
+          RELEASE_DATA='${{ steps.latest_release.outputs.data }}'
+          echo "Raw release data: $RELEASE_DATA"
+          
+          if [ -z "$RELEASE_DATA" ]; then
+            echo "Error: Release data is empty"
+            exit 1
+          fi
+          
+          TAG_NAME=$(echo $RELEASE_DATA | jq -r '.tag_name // empty')
+          ASSET_URL=$(echo $RELEASE_DATA | jq -r '.assets[0].browser_download_url // empty')
+          BODY=$(echo $RELEASE_DATA | jq -r '.body // empty')
+          
+          echo "Tag Name: $TAG_NAME"
+          echo "Asset URL: $ASSET_URL"
+          echo "Body: $BODY"
+          
+          if [ -z "$TAG_NAME" ] || [ -z "$ASSET_URL" ]; then
+            echo "Error: Failed to extract required information from release data"
+            exit 1
+          fi
+
+          NEW_CONTENT=$(jq -n --arg tag "$TAG_NAME" \
+                           --arg url "$ASSET_URL" \
+                           --arg body "$BODY" \
+                           '{tag_name: $tag, assets: [{browser_download_url: $url}], body: $body}')
+          
+          echo "New content:"
+          echo "$NEW_CONTENT" | jq '.'
+          
+          echo "Writing new content to tv-stable.json"
+          echo "$NEW_CONTENT" > tv-stable.json
+          
+          echo "Verifying tv-stable.json content:"
+          cat tv-stable.json
+          
+          echo "File size of tv-stable.json:"
+          ls -l tv-stable.json
+          
+          echo "update_needed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push changes
+        working-directory: ./mytv-android-update
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add tv-stable.json
+          git status
+          git diff --cached
+          git commit -m "Update tv-stable.json to version ${{ steps.update_json.outputs.tag_name }}"
+          git push
+          echo "Changes pushed to repository"
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}

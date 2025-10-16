@@ -19,7 +19,7 @@ android {
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 2
-        versionName = "2.3.2"
+        versionName = "2.3.3"
         vectorDrawables {
             useSupportLibrary = true
         }
@@ -37,7 +37,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-//            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
