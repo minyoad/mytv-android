@@ -69,7 +69,7 @@ fun ChannelInfo(
         if (showChannelLogoProvider()) {
             ChannelItemLogo(
                 modifier = Modifier
-                    .height(94.dp)
+                    .height(64.dp)
                     .aspectRatio(16 / 9f),
                 logoProvider = { channelProvider().logo },
             )
