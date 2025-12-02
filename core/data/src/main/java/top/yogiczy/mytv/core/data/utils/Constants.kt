@@ -61,7 +61,7 @@ object Constants {
         listOf(
             EpgSource(
                 name = "默认节目单 my吧",
-                url = "https://iptv.mybacc.com/e.xml.gz",
+                url = "https://iptv-cdn.mybacc.com/epg/e.xml.gz",
             ),
             EpgSource(
                 name = "默认节目单 老张的EPG",
@@ -82,7 +82,7 @@ object Constants {
     /**
      * 频道logo来源
      */
-    val CHANNEL_LOGO_SOURCE="https://iptv.mybacc.com/logo?ch="
+    val CHANNEL_LOGO_SOURCE="https://iptv-cdn.mybacc.com/logo/"
 
     /**
      * 节目单刷新时间阈值（小时）
