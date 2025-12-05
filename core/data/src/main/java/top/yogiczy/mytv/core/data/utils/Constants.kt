@@ -38,6 +38,10 @@ object Constants {
                 url = "https://live.fanmingming.cn/tv/m3u/ipv6.m3u",
             ),
             IptvSource(
+                name = "默认直播源 冰茶",
+                url = GITHUB_PROXY+"https://raw.githubusercontent.com/ls125781003/tvboxtg/refs/heads/main/%E9%A5%AD%E5%A4%AA%E7%A1%AC/lives/%E5%86%B0%E8%8C%B6.txt",
+            ),
+            IptvSource(
                 name = "默认直播源 yuanzl77（IPV4/IPV6）",
                 url = GITHUB_PROXY+"https://raw.githubusercontent.com/yuanzl77/IPTV/main/live.m3u",
             ),
