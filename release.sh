@@ -1,103 +1,103 @@
 #!/bin/bash
 
-# Óöµ½´íÎóÁ¢¼´Í£Ö¹
+# é‡åˆ°é”™è¯¯ç«‹å³åœæ­¢
 set -e
 
-# ÅäÖÃÎÄ¼şÂ·¾¶
+# é…ç½®æ–‡ä»¶è·¯å¾„
 GRADLE_FILE="tv/build.gradle.kts"
 
-# 1. ¼ì²éÎÄ¼şÊÇ·ñ´æÔÚ
+# 1. æ£€æŸ¥æ–‡ä»¶æ˜¯å¦å­˜åœ¨
 if [ ! -f "$GRADLE_FILE" ]; then
-    echo "? ´íÎó: ÕÒ²»µ½ÎÄ¼ş $GRADLE_FILE"
+    echo "âŒ é”™è¯¯: æ‰¾ä¸åˆ°æ–‡ä»¶ $GRADLE_FILE"
     exit 1
 fi
 
-# 2. ÌáÈ¡µ±Ç°°æ±¾ĞÅÏ¢
-# Ê¹ÓÃ sed ÌáÈ¡ versionCode = ºóµÄÊı×Ö
+# 2. æå–å½“å‰ç‰ˆæœ¬ä¿¡æ¯
+# ä½¿ç”¨ sed æå– versionCode = åçš„æ•°å­—
 CURRENT_CODE=$(grep "versionCode =" "$GRADLE_FILE" | sed -E 's/.*versionCode = ([0-9]+).*/\1/')
-# Ê¹ÓÃ sed ÌáÈ¡ versionName = ºóµÄÒıºÅÄÚÈİ
+# ä½¿ç”¨ sed æå– versionName = åçš„å¼•å·å†…å®¹
 CURRENT_NAME=$(grep "versionName =" "$GRADLE_FILE" | sed -E 's/.*versionName = "([^"]+)".*/\1/')
 
 if [ -z "$CURRENT_CODE" ] || [ -z "$CURRENT_NAME" ]; then
-    echo "? ´íÎó: ÎŞ·¨´Ó $GRADLE_FILE ÖĞ½âÎö°æ±¾ĞÅÏ¢£¬Çë¼ì²éÎÄ¼ş¸ñÊ½¡£"
+    echo "âŒ é”™è¯¯: æ— æ³•ä» $GRADLE_FILE ä¸­è§£æç‰ˆæœ¬ä¿¡æ¯ï¼Œè¯·æ£€æŸ¥æ–‡ä»¶æ ¼å¼ã€‚"
     exit 1
 fi
 
-# 3. ¼ÆËãĞÂ°æ±¾ Code (×Ô¶¯ +1)
+# 3. è®¡ç®—æ–°ç‰ˆæœ¬ Code (è‡ªåŠ¨ +1)
 NEW_CODE=$((CURRENT_CODE + 1))
 
-# 4. ½»»¥ÊäÈë
+# 4. äº¤äº’è¾“å…¥
 echo "========================================"
-echo "? µ±Ç°°æ±¾: $CURRENT_NAME (Code: $CURRENT_CODE)"
-echo "? ÏÂ¸ö°æ±¾ Code ½«×Ô¶¯Éı¼¶Îª: $NEW_CODE"
+echo "ğŸ“¦ å½“å‰ç‰ˆæœ¬: $CURRENT_NAME (Code: $CURRENT_CODE)"
+echo "ğŸš€ ä¸‹ä¸ªç‰ˆæœ¬ Code å°†è‡ªåŠ¨å‡çº§ä¸º: $NEW_CODE"
 echo "========================================"
 
-# Èç¹û½Å±¾´ø²ÎÊıÔËĞĞ (./release.sh 2.3.5)£¬ÔòÖ±½ÓÊ¹ÓÃ²ÎÊı
+# å¦‚æœè„šæœ¬å¸¦å‚æ•°è¿è¡Œ (./release.sh 2.3.5)ï¼Œåˆ™ç›´æ¥ä½¿ç”¨å‚æ•°
 if [ -n "$1" ]; then
     NEW_NAME="$1"
 else
-    read -p "ÇëÊäÈëĞÂ°æ±¾Ãû³Æ (Ö±½Ó»Ø³µ±£³Ö $CURRENT_NAME): " INPUT_NAME
-    # Èç¹ûÊäÈëÎª¿Õ£¬ÔòÊ¹ÓÃµ±Ç°Ãû³Æ
+    read -p "è¯·è¾“å…¥æ–°ç‰ˆæœ¬åç§° (ç›´æ¥å›è½¦ä¿æŒ $CURRENT_NAME): " INPUT_NAME
+    # å¦‚æœè¾“å…¥ä¸ºç©ºï¼Œåˆ™ä½¿ç”¨å½“å‰åç§°
     NEW_NAME=${INPUT_NAME:-$CURRENT_NAME}
 fi
 
 echo ""
-echo "¼´½«Ö´ĞĞ¸üĞÂ:"
+echo "å³å°†æ‰§è¡Œæ›´æ–°:"
 echo "   Version Name: $CURRENT_NAME -> $NEW_NAME"
 echo "   Version Code: $CURRENT_CODE -> $NEW_CODE"
 echo ""
 
-read -p "È·ÈÏ¼ÌĞøÂğ? (y/n) " -n 1 -r
+read -p "ç¡®è®¤ç»§ç»­å—? (y/n) " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "ÒÑÈ¡Ïû¡£"
+    echo "å·²å–æ¶ˆã€‚"
     exit 1
 fi
 
-# 5. ĞŞ¸Ä Gradle ÎÄ¼ş
-echo "ÕıÔÚ¸üĞÂ $GRADLE_FILE ..."
+# 5. ä¿®æ”¹ Gradle æ–‡ä»¶
+echo "æ­£åœ¨æ›´æ–° $GRADLE_FILE ..."
 
-# Ìæ»» versionCode (Æ¥Åä versionCode = Êı×Ö)
+# æ›¿æ¢ versionCode (åŒ¹é… versionCode = æ•°å­—)
 sed -i.bak "s/versionCode = [0-9]*/versionCode = $NEW_CODE/" "$GRADLE_FILE"
 
-# Ìæ»» versionName (Æ¥Åä versionName = "ÈÎÒâ×Ö·û")
+# æ›¿æ¢ versionName (åŒ¹é… versionName = "ä»»æ„å­—ç¬¦")
 sed -i.bak "s/versionName = \".*\"/versionName = \"$NEW_NAME\"/" "$GRADLE_FILE"
 
-# É¾³ı±¸·İÎÄ¼ş
+# åˆ é™¤å¤‡ä»½æ–‡ä»¶
 rm "${GRADLE_FILE}.bak"
 
-# 6. Git ²Ù×÷
+# 6. Git æ“ä½œ
 TAG_NAME="v$NEW_NAME"
 
-echo "ÕıÔÚÖ´ĞĞ Git Ìá½»..."
+echo "æ­£åœ¨æ‰§è¡Œ Git æäº¤..."
 git add "$GRADLE_FILE"
 git commit -m "chore(release): bump version to $NEW_NAME (code $NEW_CODE)"
 
-# ´¦Àí Tag ÖØ¸´µÄÇé¿ö (Èç¹ûÊÇÍ¬Ò»¸ö°æ±¾ºÅÖØĞÂ·¢²¼)
+# å¤„ç† Tag é‡å¤çš„æƒ…å†µ (å¦‚æœæ˜¯åŒä¸€ä¸ªç‰ˆæœ¬å·é‡æ–°å‘å¸ƒ)
 if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-    read -p "?? Tag $TAG_NAME ÒÑ´æÔÚ¡£ÊÇ·ñ¸²¸Ç? (y/n) " -n 1 -r
+    read -p "âš ï¸ Tag $TAG_NAME å·²å­˜åœ¨ã€‚æ˜¯å¦è¦†ç›–? (y/n) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         git tag -d "$TAG_NAME"
         git push origin :refs/tags/"$TAG_NAME"
     else
-        echo "ÒÑÈ¡Ïû Tag ´´½¨£¬½öÌá½»ÁË´úÂë¡£"
+        echo "å·²å–æ¶ˆ Tag åˆ›å»ºï¼Œä»…æäº¤äº†ä»£ç ã€‚"
         exit 0
     fi
 fi
 
 git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
 
-echo "? ±¾µØ²Ù×÷Íê³É¡£"
+echo "âœ… æœ¬åœ°æ“ä½œå®Œæˆã€‚"
 
-# 7. ÍÆËÍ
-read -p "ÊÇ·ñÁ¢¼´ÍÆËÍµ½ GitHub ´¥·¢±àÒë? (y/n) " -n 1 -r
+# 7. æ¨é€
+read -p "æ˜¯å¦ç«‹å³æ¨é€åˆ° GitHub è§¦å‘ç¼–è¯‘? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "ÕıÔÚÍÆËÍµ½ GitHub..."
+    echo "æ­£åœ¨æ¨é€åˆ° GitHub..."
     git push origin main
     git push origin "$TAG_NAME"
-    echo "? ÍÆËÍ³É¹¦£¡GitHub Action Ó¦¸ÃÒÑ¾­¿ªÊ¼¹¹½¨¡£"
+    echo "ğŸš€ æ¨é€æˆåŠŸï¼GitHub Action åº”è¯¥å·²ç»å¼€å§‹æ„å»ºã€‚"
 else
-    echo "ÇëÉÔºóÊÖ¶¯Ö´ĞĞ: git push origin main && git push origin $TAG_NAME"
+    echo "è¯·ç¨åæ‰‹åŠ¨æ‰§è¡Œ: git push origin main && git push origin $TAG_NAME"
 fi
