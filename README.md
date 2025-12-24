@@ -11,7 +11,7 @@
 </div>
     <p>使用Android原生开发的电视直播软件</p>
 
-<img src="./screenshots/Screenshot_panel.png" width="96%"/>
+<img src="./screenshots/Screenshot_classic_channels.png" width="96%"/>
 <br/>
 <img src="./screenshots/Screenshot_temp_panel.png" width="48%"/>
 <img src="./screenshots/Screenshot_settings.png" width="48%"/>
@@ -85,9 +85,8 @@
 
 ## 说明
 
-- 主要解决 [my_tv](https://github.com/yaoxieyoulei/my_tv)（flutter）在低端设备上播放（4k）视频卡顿掉帧
 - 仅支持Android5及以上
-- 网络环境必须支持IPV6（默认直播源）
+- 部分直播源要求网络环境必须支持IPV6
 - 只在自家电视上测过，其他电视稳定性未知
 
 ## 功能
@@ -105,10 +104,6 @@
 - [x] 应用自定义设置
 - [x] TV端适配
 - [ ] 性能优化
-
-## 更新日志
-
-[更新日志](./CHANGELOG.md)
 
 ## 声明
 
