@@ -2,8 +2,12 @@ package top.yogiczy.mytv.tv.ui.screens.main.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
@@ -68,6 +72,25 @@ fun MainContent(
         val idx = it.toInt() - 1
         filteredChannelGroupListProvider().channelList.getOrNull(idx)?.let { channel ->
             mainContentState.changeCurrentChannel(channel)
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // 监听生命周期：从后台回到前台时立即刷新当前频道
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) {
+                // 重新走一遍“换台”逻辑，达到刷新目的
+                mainContentState.changeCurrentChannel(
+                    mainContentState.currentChannel,
+                    mainContentState.currentChannelUrlIdx
+                )
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
