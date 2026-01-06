@@ -88,6 +88,14 @@ fun ClassicChannelScreen(
     val screenAutoCloseState = rememberScreenAutoCloseState(onTimeout = onClose)
     val channelGroupList = channelGroupListProvider()
     val channelFavoriteListVisible = remember { channelFavoriteListVisibleProvider() }
+    val channelFavoriteEnabled = channelFavoriteEnabledProvider()
+
+    val displayedChannelGroupList = remember(channelGroupList, channelFavoriteEnabled) {
+        if (channelFavoriteEnabled)
+            ChannelGroupList(listOf(ClassicPanelScreenFavoriteChannelGroup) + channelGroupList)
+        else
+            channelGroupList
+    }
 
     var focusedChannelGroup by remember {
         mutableStateOf(
@@ -116,12 +124,7 @@ fun ClassicChannelScreen(
         Row {
             ClassicChannelGroupItemList(
                 modifier = Modifier.onSizeChanged { groupWidth = it.width },
-                channelGroupListProvider = {
-                    if (channelFavoriteEnabledProvider())
-                        ChannelGroupList(listOf(ClassicPanelScreenFavoriteChannelGroup) + channelGroupList)
-                    else
-                        channelGroupList
-                },
+                channelGroupListProvider = { displayedChannelGroupList },
                 initialChannelGroupProvider = {
                     if (channelFavoriteListVisible)
                         ClassicPanelScreenFavoriteChannelGroup
@@ -171,17 +174,25 @@ fun ClassicChannelScreen(
             )
 
             Visible({ epgListVisible }) {
+                val currentEpgList = epgListProvider()
+                val matchedEpgList = remember(currentEpgList, focusedChannel) {
+                    currentEpgList.match(focusedChannel)
+                }
+
+                val currentReserveList = epgProgrammeReserveListProvider()
+                val matchedReserveList = remember(currentReserveList, focusedChannel) {
+                    EpgProgrammeReserveList(
+                        currentReserveList.filter { it.channel == focusedChannel.name }
+                    )
+                }
+
                 ClassicEpgItemList(
                     modifier = Modifier
-                        .onFocusChanged { epgListIsFocused = it.hasFocus || it.hasFocus },
+                        .onFocusChanged { epgListIsFocused = it.hasFocus },
                     programmeListModifier = Modifier
                         .width(if (epgListIsFocused) 340.dp else 268.dp),
-                    epgProvider = { epgListProvider().match(focusedChannel) },
-                    epgProgrammeReserveListProvider = {
-                        EpgProgrammeReserveList(
-                            epgProgrammeReserveListProvider().filter { it.channel == focusedChannel.name }
-                        )
-                    },
+                    epgProvider = { matchedEpgList },
+                    epgProgrammeReserveListProvider = { matchedReserveList },
                     supportPlaybackProvider = { supportPlaybackProvider(focusedChannel) },
                     currentPlaybackEpgProgrammeProvider = currentPlaybackEpgProgrammeProvider,
                     onEpgProgrammePlayback = { onEpgProgrammePlayback(focusedChannel, it) },
