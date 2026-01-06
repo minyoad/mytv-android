@@ -20,8 +20,8 @@ import androidx.tv.material3.RadioButton
 import androidx.tv.material3.Text
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
+import top.yogiczy.mytv.core.data.network.OkHttp
 import top.yogiczy.mytv.core.data.utils.ChannelUtil
 import top.yogiczy.mytv.core.util.utils.isIPv6
 import top.yogiczy.mytv.tv.ui.material.Tag
@@ -84,7 +84,7 @@ private fun rememberUrlDelay(url: String): Long {
     LaunchedEffect(Unit) {
         try {
             withContext(Dispatchers.IO) {
-                val client = OkHttpClient()
+                val client = OkHttp.client
                 val request = Request.Builder().url(url).build()
 
                 elapsedTime = measureTimeMillis {

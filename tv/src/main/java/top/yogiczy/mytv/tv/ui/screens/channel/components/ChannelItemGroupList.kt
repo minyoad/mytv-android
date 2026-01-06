@@ -63,7 +63,10 @@ fun ChannelItemGroupList(
         verticalArrangement = Arrangement.spacedBy(20.dp),
         contentPadding = PaddingValues(bottom = childPadding.bottom),
     ) {
-        itemsIndexed(channelGroupList) { index, channelGroup ->
+        itemsIndexed(
+            items = channelGroupList,
+            key = { _, group -> group.name } // 使用分组名称作为唯一键
+        ) { index, channelGroup ->
             Row(
                 modifier = Modifier.padding(start = childPadding.start),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),

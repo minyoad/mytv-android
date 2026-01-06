@@ -59,7 +59,10 @@ fun ChannelItemList(
         ),
         horizontalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        items(channelList) { channel ->
+        items(
+            items = channelList,
+            key = { it.name } // 使用频道名称作为唯一键
+        ) { channel ->
             ChannelItem(
                 channelProvider = { channel },
                 showChannelLogoProvider = showChannelLogoProvider,

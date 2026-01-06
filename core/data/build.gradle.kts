@@ -44,6 +44,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization)
 
+    implementation(project(":core:util"))
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

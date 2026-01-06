@@ -2,11 +2,11 @@ package top.yogiczy.mytv.core.data.repositories.iptv
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelList
 import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSource
+import top.yogiczy.mytv.core.data.network.OkHttp
 import top.yogiczy.mytv.core.data.network.await
 import top.yogiczy.mytv.core.data.repositories.FileCacheRepository
 import top.yogiczy.mytv.core.data.repositories.iptv.parser.IptvParser
@@ -44,7 +44,7 @@ class IptvRepository(
     private suspend fun fetchSource(sourceUrl: String): String {
         log.d("获取远程直播源: $source")
 
-        val client = OkHttpClient()
+        val client = OkHttp.client
         val request = Request.Builder().url(sourceUrl).build()
 
         try {

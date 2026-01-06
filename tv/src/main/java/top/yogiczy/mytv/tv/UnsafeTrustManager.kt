@@ -7,6 +7,7 @@ import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
@@ -28,12 +29,20 @@ class UnsafeTrustManager : X509TrustManager {
     }
 
     companion object {
-        fun enableUnsafeTrustManager() {
-            try {
+        fun getSSLSocketFactory(): SSLSocketFactory {
+            return try {
                 val trustAllCerts = arrayOf<TrustManager>(UnsafeTrustManager())
                 val sslContext = SSLContext.getInstance("TLS")
                 sslContext.init(null, trustAllCerts, SecureRandom())
-                HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.socketFactory)
+                sslContext.socketFactory
+            } catch (e: Exception) {
+                throw RuntimeException(e)
+            }
+        }
+
+        fun enableUnsafeTrustManager() {
+            try {
+                HttpsURLConnection.setDefaultSSLSocketFactory(getSSLSocketFactory())
                 HttpsURLConnection.setDefaultHostnameVerifier { _, _ -> true }
             } catch (e: NoSuchAlgorithmException) {
                 e.printStackTrace()

@@ -11,6 +11,8 @@ import okio.ForwardingSource
 import okio.buffer
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.TimeUnit
+
 object Downloader {
     suspend fun downloadTo(url: String, filePath: String, onProgressCb: ((Int) -> Unit)?) =
         withContext(Dispatchers.IO) {
@@ -20,7 +22,18 @@ object Downloader {
                     .body(DownloadResponseBody(originalResponse, onProgressCb)).build()
             }
 
-            val client = OkHttpClient.Builder().addNetworkInterceptor(interceptor).build()
+            val client = OkHttpClient.Builder()
+                .addNetworkInterceptor(interceptor)
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
+                .writeTimeout(10, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .sslSocketFactory(
+                    UnsafeTrustManager.getSSLSocketFactory(),
+                    UnsafeTrustManager()
+                )
+                .hostnameVerifier { _, _ -> true }
+                .build()
             val request = okhttp3.Request.Builder().url(url).build()
 
             try {
