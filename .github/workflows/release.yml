@@ -24,7 +24,7 @@ jobs:
         run: |
           # ★ 手动触发时取 inputs.tag，push 触发时自动解析
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          git fetch --tags
+          git fetch --tags --force
           git checkout "$TAG"
           echo "TAG=$TAG" >> $GITHUB_ENV
 
