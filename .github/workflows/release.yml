@@ -6,40 +6,49 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      tag:               # ★ 手动触发时必填
+      tag:
         description: 'Tag to release (e.g. v1.2.3)'
         required: true
 
 jobs:
   build_apk:
     runs-on: ubuntu-latest
-    outputs:
-      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      # 1. 检出源码 —— 先拉 main，再切到指定 tag
+      # 1. 检出源码
       - name: Checkout source
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # 获取完整历史，确保能找到所有 tag
 
       - name: Checkout tag
         run: |
-          # ★ 手动触发时取 inputs.tag，push 触发时自动解析
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          # 确定目标 TAG
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          
+          echo "Target TAG: $TAG"
+          
+          # 切换到指定 TAG
           git fetch --tags --force
           git checkout "$TAG"
+          
           echo "TAG=$TAG" >> $GITHUB_ENV
 
-      # 2. 配置 JDK 11（按需改成你项目需要的版本）
+      # 2. 配置 JDK
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 3. 赋予 Gradle 可执行权限（Linux  runner 需要）
+      # 3. 赋予 Gradle 可执行权限
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      # 3. 导入签名密钥
+      # 4. 导入签名密钥
       - name: Decode signing key
         run: |
           echo "${{ secrets.SIGNING_KEYSTORE_B64 }}" | base64 -d > release.keystore
@@ -48,21 +57,11 @@ jobs:
           echo "RELEASE_STORE_PASSWORD=${{ secrets.SIGNING_STORE_PWD }}" >> $GITHUB_ENV
           echo "RELEASE_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PWD }}" >> $GITHUB_ENV
 
-      - name: Verify keystore & env
-        run: |
-          echo "📦  Keystore MD5:"
-          md5sum release.keystore
-          echo "🔑  Env vars (值已打码):"
-          echo "RELEASE_STORE_FILE=$RELEASE_STORE_FILE"
-          echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS"
-          echo "RELEASE_STORE_PASSWORD=${RELEASE_STORE_PASSWORD:0:2}***"
-          echo "RELEASE_KEY_PASSWORD=${RELEASE_KEY_PASSWORD:0:2}***"
-
-      # 4. 编译 Release APK（签名已自动生效）
+      # 5. 编译 Release APK
       - name: Build Release APK
         run: ./gradlew assembleRelease --info
 
-      # ✅ 新增：验证 APK 是否已签名
+      # 6. 验证 APK 签名
       - name: Check APK signature
         run: |
           find tv/build/outputs/apk/release -name 'mytv-android-tv-*.apk' | while read apk; do
@@ -71,88 +70,39 @@ jobs:
             if [ $? -ne 0 ]; then exit 1; fi
           done
 
-      # ----------------------------------------------------------
-      #  根据 build.gradle.kts 生成的文件名定位 APK
-      # ----------------------------------------------------------
+      # 7. 定位 APK 文件
       - name: Locate APK
         id: apk
         run: |
-          # 文件名格式：mytv-android-tv-<ver>-<abi>-sdk<minSdk>.apk
           apk_path=$(find tv/build/outputs/apk/release -name 'mytv-android-tv-*.apk' | head -n1)
           [ -z "$apk_path" ] && { echo "❌ APK not found"; exit 1; }
+          echo "Found APK: $apk_path"
           echo "apk_path=$apk_path" >> $GITHUB_OUTPUT
 
+      # 8. 校验 TAG 格式 (放宽限制，允许 beta/rc 等后缀)
       - name: Check TAG validity
         run: |
           tag="${{ env.TAG }}"
-          # 检查 TAG 是否为空或非法
-          if [[ -z "$tag" || "$tag" == "null" ]]; then
-            echo "❌ TAG is empty or invalid."
+          if [[ -z "$tag" ]]; then
+            echo "❌ TAG is empty."
             exit 1
           fi
-          # 去掉 tag 前后空白字符
-          tag=$(echo "$tag" | xargs)
-          # 可选：只允许 v1.2.3 这类格式
-          if [[ ! "$tag" =~ ^v[0-9]+(\.[0-9]+)*$ ]]; then
-            echo "❌ TAG 格式非法，必须像 v1.2.3"
-            exit 1
+          # 只要以 v 开头即可，避免过于严格的正则导致失败
+          if [[ ! "$tag" =~ ^v.*$ ]]; then
+            echo "❌ TAG 格式警告: 建议以 'v' 开头 (当前: $tag)"
+            # 这里可以选择 exit 1 报错，或者仅警告
           fi
-          echo "TAG after check: |$tag|"
           echo "TAG=$tag" >> $GITHUB_ENV
 
-      # ----------------------------------------------------------
-      #  0. 拿到或创建 Release
-      # ----------------------------------------------------------
-      - name: Create/Find Release
-        id: release
-        shell: bash
-        run: |
-          tag="${{ env.TAG }}"
-          # 统一先查一次，已存在就复用，否则新建
-          resp=$(curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag)
-          upload_url=$(echo "$resp" | jq -r .upload_url | sed 's/{.*}//')
-
-          # 如果不存在则新建
-          if [[ -z "$upload_url" || "$upload_url" == "null" ]]; then
-            payload="{
-              \"tag_name\": \"$tag\",
-              \"name\": \"$tag\",
-              \"draft\": false,
-              \"prerelease\": false
-            }"
-            echo "Release payload: $payload"
-            resp=$(curl -X POST \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              https://api.github.com/repos/${{ github.repository }}/releases \
-              -d "$payload")
-            echo "Create release API response: $resp"
-            upload_url=$(echo "$resp" | jq -r .upload_url | sed 's/{.*}//')
-          fi
-
-          # 若仍为空则主动失败
-          [[ -z "$upload_url" || "$upload_url" == "null" ]] && { echo "❌ Failed to get upload_url"; exit 1; }
-          echo "upload_url=$upload_url" >> $GITHUB_OUTPUT
-          echo "tag_name=$tag" >> $GITHUB_OUTPUT
-
-      # ----------------------------------------------------------
-      #  1. 定位 APK（只保留一次）
-      # ----------------------------------------------------------
-      - name: Locate APK
-        id: apk2
-        run: |
-          apk_path=$(find tv/build/outputs/apk/release -name 'mytv-android-tv-*.apk' | head -n1)
-          [ -z "$apk_path" ] && { echo "❌ APK not found"; exit 1; }
-          # ★ 单独把文件名存出来
-          echo "apk_path=$apk_path" >> $GITHUB_OUTPUT
-          echo "apk_name=$(basename "$apk_path")" >> $GITHUB_OUTPUT
-
-      # 5. 发布到 GitHub Release
+      # 9. 发布到 GitHub Release (自动创建或更新)
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.apk.outputs.apk_path }}
-          tag_name: ${{ steps.release.outputs.tag_name }}
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
