@@ -96,6 +96,7 @@ fun ChannelItem(
                     ChannelItemLogo(
                         modifier = Modifier.align(Alignment.Center),
                         logoProvider = { channelProvider().logo },
+                        textFallbackProvider = { channelProvider().name },
                     )
                 }
             }

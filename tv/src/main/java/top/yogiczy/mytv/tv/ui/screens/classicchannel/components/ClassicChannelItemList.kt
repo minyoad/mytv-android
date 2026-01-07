@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -225,12 +226,14 @@ private fun ClassicChannelItem(
         if (showChannelLogoProvider()) {
             Box(
                 modifier = Modifier
-                    .width(60.dp)
-                    .fillMaxHeight()
+                    .height(40.dp)
+                    .aspectRatio(1.6f),
+                contentAlignment = Alignment.Center
             ) {
                 ChannelItemLogo(
-                    modifier = Modifier.align(Alignment.Center),
+                    modifier = Modifier.fillMaxHeight(),
                     logoProvider = { channel.logo },
+                    textFallbackProvider = { channel.name },
                 )
             }
         }

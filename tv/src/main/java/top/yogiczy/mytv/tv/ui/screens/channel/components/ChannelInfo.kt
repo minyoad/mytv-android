@@ -72,6 +72,7 @@ fun ChannelInfo(
                     .height(64.dp)
                     .aspectRatio(16 / 9f),
                 logoProvider = { channelProvider().logo },
+                textFallbackProvider = { channelProvider().name },
             )
         }
 
