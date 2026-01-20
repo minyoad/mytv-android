@@ -26,10 +26,14 @@ import top.yogiczy.mytv.core.data.utils.Constants
 import top.yogiczy.mytv.tv.ui.material.Snackbar
 import top.yogiczy.mytv.tv.ui.material.SnackbarType
 import top.yogiczy.mytv.tv.ui.utils.Configs
-
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 class MainViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Loading())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+    // Add property to store last EPG update date
+    private var lastEpgUpdateDate: LocalDate? = null
 
     init {
         init()
@@ -43,6 +47,16 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    // Add method to handle app resume
+    fun onAppResume() {
+        viewModelScope.launch {
+            val currentDate = LocalDate.now()
+            if (lastEpgUpdateDate != null && lastEpgUpdateDate != currentDate) {
+                // Date changed, refresh EPG
+                refreshEpg()
+            }
+        }
+    }
     private fun onChannelChanged() {
         viewModelScope.launch {
             Configs.iptvChannelUrlIdx= emptyMap()
@@ -128,6 +142,8 @@ class MainViewModel : ViewModel() {
                     Snackbar.show("节目单获取失败，请检查网络连接", type = SnackbarType.ERROR)
                 }
                 .map { epgList ->
+                    // Record current date when EPG is successfully updated
+                    lastEpgUpdateDate = LocalDate.now()
                     _uiState.value = (_uiState.value as MainUiState.Ready).copy(epgList = epgList)
                 }
                 .collect()
