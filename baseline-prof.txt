@@ -1,0 +1,21 @@
+# Baseline Profile for top.yogiczy.mytv.tv
+
+# Main Activity
+HSPLtop/yogiczy/mytv/tv/MainActivity;-><init>()V
+HSPLtop/yogiczy/mytv/tv/MainActivity;->onCreate(Landroid/os/Bundle;)V
+
+# Compose UI
+HSPLandroidx/compose/ui/platform/ComposeView;-><init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V
+HSPLandroidx/compose/ui/platform/AbstractComposeView;-><init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V
+
+# Common Composables
+HSPLtop/yogiczy/mytv/tv/ui/screens/main/MainScreenKt;->MainScreen(Landroidx/compose/runtime/Composer;I)V
+HSPLtop/yogiczy/mytv/tv/ui/screens/main/components/MainContentKt;->MainContent(Landroidx/compose/runtime/Composer;I)V
+HSPLtop/yogiczy/mytv/tv/ui/screens/settings/SettingsScreenKt;->SettingsScreen(Landroidx/compose/runtime/Composer;I)V
+
+# Data Loading
+HSPLtop/yogiczy/mytv/core/data/repositories/iptv/IptvRepository;->getChannelGroupList()Lkotlinx/coroutines/flow/Flow;
+HSPLtop/yogiczy/mytv/core/data/repositories/epg/EpgRepository;->getEpgList(Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+
+# Video Player
+HSPLtop/yogiczy/mytv/tv/ui/video/VideoPlayerKt;->VideoPlayer(Landroidx/compose/runtime/Composer;I)V
