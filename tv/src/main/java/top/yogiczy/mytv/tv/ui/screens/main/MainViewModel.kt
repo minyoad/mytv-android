@@ -42,6 +42,9 @@ class MainViewModel : ViewModel() {
     fun init() {
         viewModelScope.launch {
             _uiState.value = MainUiState.Loading()
+            if(Configs.iptvHybridMode!= Configs.IptvHybridMode.DISABLE) {
+                ChannelUtil.loadHybridWebViewUrlFromRemote(Constants.WEBVIEW_CHANNELS_URL)
+            }
             refreshChannel()
             refreshEpg()
         }
