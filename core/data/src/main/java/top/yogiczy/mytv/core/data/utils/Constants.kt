@@ -1,5 +1,6 @@
 package top.yogiczy.mytv.core.data.utils
 
+import android.webkit.WebView
 import top.yogiczy.mytv.core.data.entities.epgsource.EpgSource
 import top.yogiczy.mytv.core.data.entities.epgsource.EpgSourceList
 import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSource
@@ -23,6 +24,8 @@ object Constants {
      * GitHub加速代理地址
      */
     const val GITHUB_PROXY = "https://gh.monlor.com/"
+
+    const val WEBVIEW_CHANNELS_URL="https://raw.githubusercontent.com/minyoad/my-iptv/refs/heads/master/list/webview_channels.txt"
 
     /**
      * IPTV直播源
@@ -86,7 +89,7 @@ object Constants {
     /**
      * 频道logo来源
      */
-    val CHANNEL_LOGO_SOURCE="https://iptv-cdn.mybacc.com/logo/"
+    const val CHANNEL_LOGO_SOURCE="https://iptv-cdn.mybacc.com/logo/"
 
     /**
      * 节目单刷新时间阈值（小时）

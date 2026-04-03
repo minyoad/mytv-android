@@ -42,6 +42,7 @@ class MainViewModel : ViewModel() {
     fun init() {
         viewModelScope.launch {
             _uiState.value = MainUiState.Loading()
+            ChannelUtil.loadHybridWebViewUrlFromRemote(Constants.WEBVIEW_CHANNELS_URL)
             refreshChannel()
             refreshEpg()
         }
