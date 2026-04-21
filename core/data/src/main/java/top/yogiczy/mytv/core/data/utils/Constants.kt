@@ -1,6 +1,5 @@
 package top.yogiczy.mytv.core.data.utils
 
-import android.webkit.WebView
 import top.yogiczy.mytv.core.data.entities.epgsource.EpgSource
 import top.yogiczy.mytv.core.data.entities.epgsource.EpgSourceList
 import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSource

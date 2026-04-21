@@ -27,7 +27,7 @@ import top.yogiczy.mytv.tv.ui.material.Snackbar
 import top.yogiczy.mytv.tv.ui.material.SnackbarType
 import top.yogiczy.mytv.tv.ui.utils.Configs
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+
 class MainViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Loading())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -68,7 +68,7 @@ class MainViewModel : ViewModel() {
 
     private suspend fun refreshChannel() {
         flow {
-            var iptvRepository= IptvRepository(Configs.iptvSourceCurrent)
+            val iptvRepository= IptvRepository(Configs.iptvSourceCurrent)
             iptvRepository.setDataChanged({ onChannelChanged() })
             emit(
                 iptvRepository.getChannelGroupList(cacheTime = Configs.iptvSourceCacheTime)

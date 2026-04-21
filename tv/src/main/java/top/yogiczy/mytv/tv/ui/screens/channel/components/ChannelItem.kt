@@ -142,7 +142,7 @@ private fun ChannelItemContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "${channel.id}",
+                channel.id,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 modifier = Modifier.alpha(0.8f).padding(end = 6.dp),

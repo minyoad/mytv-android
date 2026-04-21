@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -175,15 +176,19 @@ fun ClassicChannelScreen(
 
             Visible({ epgListVisible }) {
                 val currentEpgList = epgListProvider()
-                val matchedEpgList = remember(currentEpgList, focusedChannel) {
-                    currentEpgList.match(focusedChannel)
+                // 💡 优化：使用 derivedStateOf，当 focusedChannel 改变时，仅重新计算值，不触发当前作用域重组
+                val matchedEpgList by remember(currentEpgList) {
+                    derivedStateOf { currentEpgList.match(focusedChannel) }
                 }
 
                 val currentReserveList = epgProgrammeReserveListProvider()
-                val matchedReserveList = remember(currentReserveList, focusedChannel) {
-                    EpgProgrammeReserveList(
-                        currentReserveList.filter { it.channel == focusedChannel.name }
-                    )
+                // 💡 优化：使用 derivedStateOf
+                val matchedReserveList by remember(currentReserveList) {
+                    derivedStateOf {
+                        EpgProgrammeReserveList(
+                            currentReserveList.filter { it.channel == focusedChannel.name }
+                        )
+                    }
                 }
 
                 ClassicEpgItemList(
