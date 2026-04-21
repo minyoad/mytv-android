@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -160,7 +161,8 @@ private fun ChannelItemContent(
             maxLines = 1,
             modifier = Modifier
                 .alpha(0.8f)
-                .ifElse(isFocused, Modifier.basicMarquee()),
+                .ifElse(isFocused, Modifier.basicMarquee())
+                .scale(1f),
         )
     }
 }

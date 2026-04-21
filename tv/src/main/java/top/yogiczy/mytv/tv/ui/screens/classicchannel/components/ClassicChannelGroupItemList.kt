@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -168,10 +169,12 @@ private fun ClassicChannelGroupItem(
             Text(
                 text = channelGroup.name,
                 textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .ifElse(isFocused, Modifier.basicMarquee()),
+                    .ifElse(isFocused, Modifier.basicMarquee())
+                    .scale(1f),
             )
         },
     )
