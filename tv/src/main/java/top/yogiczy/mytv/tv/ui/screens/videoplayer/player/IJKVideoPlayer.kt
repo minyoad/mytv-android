@@ -8,9 +8,12 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.TextureView
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import tv.danmaku.ijk.media.player.IMediaPlayer
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
 import top.yogiczy.mytv.core.data.utils.Logger
@@ -25,6 +28,10 @@ class IJKVideoPlayer(
     private var currentUrl: String? = null
     private var retryCount = 0
     private val MAX_RETRY_COUNT = 3
+    private var prepareJob: Job? = null
+    
+    // 用于确保底层播放器方法的调用是串行的，防止并发导致的 JNI 层崩溃
+    private val playerMutex = Mutex()
 
     private val ijkPlayer by lazy {
         IjkMediaPlayer().apply {
@@ -39,7 +46,7 @@ class IJKVideoPlayer(
                 Configs.videoPlayerLoadTimeout
             )
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 100L)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 1)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzedduration", 1)
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024 * 10)
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "fastseek")
         }
@@ -153,29 +160,45 @@ class IJKVideoPlayer(
 
     override fun release() {
         updatePositionJob?.cancel()
-        ijkPlayer.reset()
-        ijkPlayer.release()
+        prepareJob?.cancel()
+        val player = ijkPlayer
+        coroutineScope.launch(Dispatchers.IO) {
+            playerMutex.withLock {
+                try {
+                    player.reset()
+                    player.release()
+                } catch (e: Exception) {
+                    log.e("release error", e)
+                }
+            }
+        }
         super.release()
     }
 
     override fun prepare(url: String) {
         currentUrl = url
-        try {
-            ijkPlayer.reset()
-            // 在设置数据源前确保Surface有效
-            if (currentSurface != null) {
-                ijkPlayer.setSurface(currentSurface)
+        prepareJob?.cancel()
+        prepareJob = coroutineScope.launch(Dispatchers.IO) {
+            playerMutex.withLock {
+                try {
+                    ijkPlayer.reset()
+                    // 在设置数据源前确保Surface有效
+                    if (currentSurface != null) {
+                        ijkPlayer.setSurface(currentSurface)
+                    }
+                    /* 关键：不要带任何自定义头，防止服务器拒SETUP */
+                    val headers = emptyMap<String, String>()   // ← 空 map，让 FFmpeg 走原生流程
+                    ijkPlayer.setDataSource(context, Uri.parse(url), headers)
+                    setOption()
+                    ijkPlayer.prepareAsync()
+                    retryCount = 0
+                } catch (e: Exception) {
+                    handleError(e)
+                }
             }
-            /* 关键：不要带任何自定义头，防止服务器拒SETUP */
-            val headers = emptyMap<String, String>()   // ← 空 map，让 FFmpeg 走原生流程
-            ijkPlayer.setDataSource(context, Uri.parse(url), headers)
-            setOption()
-            ijkPlayer.prepareAsync()
-            retryCount = 0
-        } catch (e: Exception) {
-            handleError(e)
         }
     }
+
     // 添加错误处理方法
     private fun handleError(e: Exception) {
         log.e("playback error", e)
@@ -191,16 +214,32 @@ class IJKVideoPlayer(
     }
 
     override fun play() {
-        if (!ijkPlayer.isPlaying) {
-            ijkPlayer.start()
-            triggerIsPlayingChanged(true)
+        coroutineScope.launch(Dispatchers.IO) {
+            playerMutex.withLock {
+                try {
+                    if (!ijkPlayer.isPlaying) {
+                        ijkPlayer.start()
+                        triggerIsPlayingChanged(true)
+                    }
+                } catch (e: Exception) {
+                    log.e("play error", e)
+                }
+            }
         }
     }
 
     override fun pause() {
-        if (ijkPlayer.isPlaying) {
-            ijkPlayer.pause()
-            triggerIsPlayingChanged(false)
+        coroutineScope.launch(Dispatchers.IO) {
+            playerMutex.withLock {
+                try {
+                    if (ijkPlayer.isPlaying) {
+                        ijkPlayer.pause()
+                        triggerIsPlayingChanged(false)
+                    }
+                } catch (e: Exception) {
+                    log.e("pause error", e)
+                }
+            }
         }
     }
 
@@ -208,17 +247,34 @@ class IJKVideoPlayer(
 //        ijkPlayer.seekTo(position)
         // 对于直播流（duration <= 0），seek操作不仅无效，还可能导致播放器状态异常。
         // 增加保护，只对点播视频执行seek。
-        if (ijkPlayer.duration > 0) {
-            log.d("Seeking to $position")
-            ijkPlayer.seekTo(position)
-        } else {
-            log.w("Seek is ignored for live streams.")
+        coroutineScope.launch(Dispatchers.IO) {
+            playerMutex.withLock {
+                try {
+                    if (ijkPlayer.duration > 0) {
+                        log.d("Seeking to $position")
+                        ijkPlayer.seekTo(position)
+                    } else {
+                        log.w("Seek is ignored for live streams.")
+                    }
+                } catch (e: Exception) {
+                    log.e("seek error", e)
+                }
+            }
         }
     }
 
     override fun stop() {
         updatePositionJob?.cancel()
-        ijkPlayer.stop()
+        prepareJob?.cancel()
+        coroutineScope.launch(Dispatchers.IO) {
+            playerMutex.withLock {
+                try {
+                    ijkPlayer.stop()
+                } catch (e: Exception) {
+                    log.e("stop error", e)
+                }
+            }
+        }
         super.stop()
     }
 
@@ -229,33 +285,59 @@ class IJKVideoPlayer(
         surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(holder: SurfaceHolder) {
                 currentSurface = holder.surface
-                ijkPlayer.setDisplay(holder)
-                // Resume playback when the surface is available again
-                play()
+                coroutineScope.launch(Dispatchers.IO) {
+                    playerMutex.withLock {
+                        try {
+                            ijkPlayer.setDisplay(holder)
+                            play()
+                        } catch (e: Exception) {
+                            log.e("setSurface error", e)
+                        }
+                    }
+                }
             }
             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
             override fun surfaceDestroyed(holder: SurfaceHolder) {
-                // Pause playback when the surface is destroyed
                 pause()
-                ijkPlayer.setSurface(null)
+                // 必须在主线程同步执行：在操作系统销毁 Surface 前，让底层的渲染线程解除绑定
+                // 否则底层的 IJK 可能会尝试把画面渲染到一个已经被回收的 Surface 上，导致 SIGSEGV (SEGV_MAPERR) 崩溃
+                try {
+                    ijkPlayer.setDisplay(null)
+                    ijkPlayer.setSurface(null)
+                } catch (e: Exception) {}
                 currentSurface?.release()
                 currentSurface = null
             }
         })
-        ijkPlayer.setDisplay(surfaceView.holder)
+        coroutineScope.launch(Dispatchers.IO) {
+            playerMutex.withLock {
+                try {
+                    ijkPlayer.setDisplay(surfaceView.holder)
+                } catch (e: Exception) {}
+            }
+        }
     }
 
     override fun setVideoTextureView(textureView: TextureView) {
         textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
                 currentSurface = Surface(surface)
-                ijkPlayer.setSurface(currentSurface)
-                play()
+                coroutineScope.launch(Dispatchers.IO) {
+                    playerMutex.withLock {
+                        try {
+                            ijkPlayer.setSurface(currentSurface)
+                            play()
+                        } catch (e: Exception) {}
+                    }
+                }
             }
             override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {}
             override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
                 pause()
-                ijkPlayer.setSurface(null)
+                // 必须在主线程同步解除绑定
+                try {
+                    ijkPlayer.setSurface(null)
+                } catch (e: Exception) {}
                 currentSurface?.release()
                 currentSurface = null
                 return true
@@ -266,7 +348,13 @@ class IJKVideoPlayer(
         if (textureView.isAvailable) {
             val newSurface = Surface(textureView.surfaceTexture)
             currentSurface = newSurface
-            ijkPlayer.setSurface(newSurface)
+            coroutineScope.launch(Dispatchers.IO) {
+                playerMutex.withLock {
+                    try {
+                        ijkPlayer.setSurface(newSurface)
+                    } catch (e: Exception) {}
+                }
+            }
         }
     }
 }
