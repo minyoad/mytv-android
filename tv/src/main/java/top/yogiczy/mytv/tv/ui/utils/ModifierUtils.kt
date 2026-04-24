@@ -1,5 +1,6 @@
 package top.yogiczy.mytv.tv.ui.utils
 
+import android.annotation.SuppressLint
 import android.os.Build
 import android.view.KeyEvent
 import androidx.compose.foundation.background
@@ -32,6 +33,7 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.unit.dp
 import kotlin.math.absoluteValue
 
+@SuppressLint("ModifierFactoryUnreferencedReceiver")
 fun Modifier.ifElse(
     condition: () -> Boolean, ifTrueModifier: Modifier, ifFalseModifier: Modifier = Modifier
 ): Modifier = then(if (condition()) ifTrueModifier else ifFalseModifier)

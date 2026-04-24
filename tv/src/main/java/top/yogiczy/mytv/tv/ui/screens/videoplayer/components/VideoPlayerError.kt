@@ -89,7 +89,7 @@ private fun getErrorCodeDesc(error: String): String? {
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun VideoPlayerErrorPreview() {
     MyTVTheme {

@@ -150,7 +150,7 @@ private fun MainScreenLoading(
     )
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun MainScreenLoadingPreview() {
     MyTVTheme {
@@ -178,7 +178,7 @@ private fun MainScreenError(
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun MainScreenErrorPreview() {
     MyTVTheme {

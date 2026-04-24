@@ -124,7 +124,7 @@ private fun EpgReverseScreenContent(
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun EpgReverseScreenContentPreview() {
     MyTVTheme {

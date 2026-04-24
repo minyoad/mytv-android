@@ -105,7 +105,7 @@ private fun VideoPlayerScreenCover(
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun VideoPlayerScreenCoverPreview() {
     MyTVTheme {

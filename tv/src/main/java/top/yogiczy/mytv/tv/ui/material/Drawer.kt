@@ -91,7 +91,7 @@ enum class DrawerPosition {
     Start, End, Top, Bottom
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun DrawerPreviewStart() {
     MyTVTheme {
@@ -104,7 +104,7 @@ private fun DrawerPreviewStart() {
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun DrawerPreviewEnd() {
     MyTVTheme {
@@ -117,7 +117,7 @@ private fun DrawerPreviewEnd() {
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun DrawerPreviewTop() {
     MyTVTheme {
@@ -130,7 +130,7 @@ private fun DrawerPreviewTop() {
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun DrawerPreviewBottom() {
     MyTVTheme {
@@ -143,7 +143,7 @@ private fun DrawerPreviewBottom() {
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun DrawerPreviewBottomNoHeader() {
     MyTVTheme {

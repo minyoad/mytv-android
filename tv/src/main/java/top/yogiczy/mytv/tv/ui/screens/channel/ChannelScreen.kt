@@ -285,7 +285,7 @@ private fun ChannelScreenBottomChannelItemListAllAndFavorite(
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun ChannelScreenTopRightPreview() {
     MyTVTheme {
@@ -295,7 +295,7 @@ private fun ChannelScreenTopRightPreview() {
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun ChannelScreenBottomPreview() {
     MyTVTheme {
@@ -311,7 +311,7 @@ private fun ChannelScreenBottomPreview() {
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun ChannelScreenBottomFavoritePreview() {
     MyTVTheme {
@@ -332,7 +332,7 @@ private fun ChannelScreenBottomFavoritePreview() {
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun ChannelScreenBottomFavoriteWithChannelLogoPreview() {
     MyTVTheme {

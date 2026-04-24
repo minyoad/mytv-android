@@ -296,7 +296,7 @@ private fun ClassicPanelScreenShowEpgTip(
 
 val ClassicPanelScreenFavoriteChannelGroup = ChannelGroup(name = "我的收藏")
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun ClassicChannelScreenPreview() {
     MyTVTheme {

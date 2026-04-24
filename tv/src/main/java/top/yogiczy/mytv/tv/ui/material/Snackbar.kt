@@ -241,7 +241,7 @@ private fun SnackbarContentPreview() {
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun SnackbarContentLongPreview() {
     MyTVTheme {
@@ -260,7 +260,7 @@ private fun SnackbarContentLongPreview() {
     }
 }
 
-@Preview(device = "id:Android TV (720p)")
+@Preview(device = "id:tv_720p")
 @Composable
 private fun SnackbarUIPreview() {
     MyTVTheme {
