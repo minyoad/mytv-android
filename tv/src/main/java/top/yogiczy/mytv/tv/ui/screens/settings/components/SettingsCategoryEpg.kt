@@ -14,6 +14,7 @@ import androidx.tv.material3.Switch
 import kotlinx.coroutines.launch
 import top.yogiczy.mytv.core.data.entities.epgsource.EpgSourceList
 import top.yogiczy.mytv.core.data.repositories.epg.EpgRepository
+import top.yogiczy.mytv.core.util.utils.humanizeMs
 import top.yogiczy.mytv.tv.ui.material.LocalPopupManager
 import top.yogiczy.mytv.tv.ui.material.SimplePopup
 import top.yogiczy.mytv.tv.ui.screens.components.SelectDialog
@@ -112,6 +113,52 @@ fun SettingsCategoryEpg(
                     },
                 )
             }
+        }
+
+        item {
+            SettingsListItem(
+                modifier = Modifier.focusRequester(it),
+                headlineContent = "空闲时刷新节目单",
+                supportingContent = "在应用空闲一定时间后自动刷新",
+                trailingContent = {
+                    Switch(settingsViewModel.epgRefreshIdleEnable, null)
+                },
+                onSelected = {
+                    settingsViewModel.epgRefreshIdleEnable = !settingsViewModel.epgRefreshIdleEnable
+                },
+            )
+        }
+
+        item {
+            val popupManager = LocalPopupManager.current
+            val focusRequester = remember { FocusRequester() }
+            var visible by remember { mutableStateOf(false) }
+
+            SettingsListItem(
+                modifier = Modifier.focusRequester(focusRequester),
+                headlineContent = "节目单空闲刷新延迟",
+                supportingContent = "无操作多久后触发刷新",
+                trailingContent = settingsViewModel.epgRefreshIdleDelay.humanizeMs(),
+                onSelected = {
+                    popupManager.push(focusRequester, true)
+                    visible = true
+                },
+            )
+
+            SelectDialog(
+                visibleProvider = { visible },
+                onDismissRequest = { visible = false },
+                title = "节目单空闲刷新延迟",
+                currentDataProvider = { settingsViewModel.epgRefreshIdleDelay },
+                dataListProvider = {
+                    listOf(1, 5, 10, 15, 30, 60, 120).map { it.toLong() * 60 * 1000 }
+                },
+                dataText = { it.humanizeMs() },
+                onDataSelected = {
+                    settingsViewModel.epgRefreshIdleDelay = it
+                    visible = false
+                },
+            )
         }
     }
 }

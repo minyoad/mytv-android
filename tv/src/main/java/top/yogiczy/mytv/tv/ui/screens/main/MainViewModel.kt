@@ -3,14 +3,18 @@ package top.yogiczy.mytv.tv.ui.screens.main
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
@@ -32,11 +36,18 @@ class MainViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Loading())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
-    // Add property to store last EPG update date
-    private var lastEpgUpdateDate: LocalDate? = null
+    private val userInteractionFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    private val idleSettingsFlow = MutableStateFlow(
+        Pair(Configs.epgRefreshIdleEnable, Configs.epgRefreshIdleDelay)
+    )
+
+    // Add property to store last EPG update timestamp
+    private var lastEpgUpdateTimestamp: Long = 0
 
     init {
         init()
+        initIdleRefresh()
     }
 
     fun init() {
@@ -50,12 +61,49 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    @OptIn(FlowPreview::class)
+    private fun initIdleRefresh() {
+        viewModelScope.launch {
+            userInteractionFlow.emit(Unit)
+            
+            // 使用 combine 监听交互和设置变化
+            kotlinx.coroutines.flow.combine(userInteractionFlow, idleSettingsFlow) { _, settings ->
+                settings
+            }
+                .debounce { (enable, delay) -> if (enable) delay else Long.MAX_VALUE }
+                .collect { (enable, _) ->
+                    if (enable) {
+                        refreshEpg()
+                    }
+                }
+        }
+    }
+
+    fun setIdleSettings(enable: Boolean, delay: Long) {
+        idleSettingsFlow.value = Pair(enable, delay)
+    }
+
+    fun onUserInteraction() {
+        viewModelScope.launch {
+            userInteractionFlow.emit(Unit)
+        }
+    }
+
     // Add method to handle app resume
     fun onAppResume() {
         viewModelScope.launch {
             val currentDate = LocalDate.now()
-            if (lastEpgUpdateDate != null && lastEpgUpdateDate != currentDate) {
+            val lastUpdateDate = java.time.Instant.ofEpochMilli(lastEpgUpdateTimestamp)
+                .atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+
+            if (lastEpgUpdateTimestamp != 0L && lastUpdateDate != currentDate) {
                 // Date changed, refresh EPG
+                refreshEpg()
+            } else if (Configs.epgRefreshIdleEnable &&
+                lastEpgUpdateTimestamp != 0L &&
+                System.currentTimeMillis() - lastEpgUpdateTimestamp > Configs.epgRefreshIdleDelay
+            ) {
+                // Idle time exceeded while in background, refresh EPG
                 refreshEpg()
             }
         }
@@ -145,8 +193,8 @@ class MainViewModel : ViewModel() {
                     Snackbar.show("节目单获取失败，请检查网络连接", type = SnackbarType.ERROR)
                 }
                 .map { epgList ->
-                    // Record current date when EPG is successfully updated
-                    lastEpgUpdateDate = LocalDate.now()
+                    // Record current timestamp when EPG is successfully updated
+                    lastEpgUpdateTimestamp = System.currentTimeMillis()
                     _uiState.value = (_uiState.value as MainUiState.Ready).copy(epgList = epgList)
                 }
                 .collect()

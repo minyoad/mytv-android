@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,13 +21,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.LocalTextStyle
@@ -55,6 +56,13 @@ fun MainScreen(
     val uiState by mainViewModel.uiState.collectAsState()
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
+    LaunchedEffect(settingsViewModel.epgRefreshIdleEnable, settingsViewModel.epgRefreshIdleDelay) {
+        mainViewModel.setIdleSettings(
+            settingsViewModel.epgRefreshIdleEnable,
+            settingsViewModel.epgRefreshIdleDelay
+        )
+    }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -76,13 +84,20 @@ fun MainScreen(
             },
             epgListProvider = { s.epgList },
             onBackPressed = onBackPressed,
+            onUserInteraction = { mainViewModel.onUserInteraction() },
         )
 
-        is MainUiState.Loading -> MainScreenSettingsWrapper(onBackPressed = onBackPressed) {
+        is MainUiState.Loading -> MainScreenSettingsWrapper(
+            onBackPressed = onBackPressed,
+            onUserInteraction = { mainViewModel.onUserInteraction() },
+        ) {
             MainScreenLoading(messageProvider = { s.message })
         }
 
-        is MainUiState.Error -> MainScreenSettingsWrapper(onBackPressed = onBackPressed) {
+        is MainUiState.Error -> MainScreenSettingsWrapper(
+            onBackPressed = onBackPressed,
+            onUserInteraction = { mainViewModel.onUserInteraction() },
+        ) {
             MainScreenError(messageProvider = { s.message })
         }
     }
@@ -197,12 +212,25 @@ private fun MainScreenErrorPreview() {
 private fun MainScreenSettingsWrapper(
     modifier: Modifier = Modifier,
     onBackPressed: () -> Unit = {},
+    onUserInteraction: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     var showSettings by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
+            .onPreviewKeyEvent {
+                onUserInteraction()
+                false
+            }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent()
+                        onUserInteraction()
+                    }
+                }
+            }
             .focusOnLaunched()
             .focusable()
             .captureBackKey { onBackPressed() }

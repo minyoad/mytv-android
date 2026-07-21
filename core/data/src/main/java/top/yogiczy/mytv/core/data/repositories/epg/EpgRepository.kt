@@ -152,7 +152,7 @@ class EpgRepository(
 
             val xmlJson = getOrRefresh({ lastModified, cachedContent ->
                 // 如果缓存为空，强制刷新；或者日期不一致也刷新
-                cachedContent.isNullOrEmpty() ||dateFormat.format(System.currentTimeMillis()) != dateFormat.format(lastModified)
+                cachedContent.isNullOrEmpty() || dateFormat.format(System.currentTimeMillis()) != dateFormat.format(lastModified)
             }) {
                 val xmlString = epgXmlRepository.getEpgXml().removeBom()
                 Json.encodeToString(

@@ -251,6 +251,22 @@ class SettingsViewModel : ViewModel() {
             Configs.epgChannelReserveList = value
         }
 
+    private var _epgRefreshIdleEnable by mutableStateOf(Configs.epgRefreshIdleEnable)
+    var epgRefreshIdleEnable: Boolean
+        get() = _epgRefreshIdleEnable
+        set(value) {
+            _epgRefreshIdleEnable = value
+            Configs.epgRefreshIdleEnable = value
+        }
+
+    private var _epgRefreshIdleDelay by mutableLongStateOf(Configs.epgRefreshIdleDelay)
+    var epgRefreshIdleDelay: Long
+        get() = _epgRefreshIdleDelay
+        set(value) {
+            _epgRefreshIdleDelay = value
+            Configs.epgRefreshIdleDelay = value
+        }
+
     private var _uiShowEpgProgrammeProgress by mutableStateOf(Configs.uiShowEpgProgrammeProgress)
     var uiShowEpgProgrammeProgress: Boolean
         get() = _uiShowEpgProgrammeProgress
@@ -430,6 +446,8 @@ class SettingsViewModel : ViewModel() {
         _epgSourceList = Configs.epgSourceList
         _epgRefreshTimeThreshold = Configs.epgRefreshTimeThreshold
         _epgChannelReserveList = Configs.epgChannelReserveList
+        _epgRefreshIdleEnable = Configs.epgRefreshIdleEnable
+        _epgRefreshIdleDelay = Configs.epgRefreshIdleDelay
         _uiShowEpgProgrammeProgress = Configs.uiShowEpgProgrammeProgress
         _uiShowEpgProgrammePermanentProgress = Configs.uiShowEpgProgrammePermanentProgress
         _uiShowChannelLogo = Configs.uiShowChannelLogo

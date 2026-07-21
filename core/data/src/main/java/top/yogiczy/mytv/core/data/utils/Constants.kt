@@ -96,6 +96,16 @@ object Constants {
     const val EPG_REFRESH_TIME_THRESHOLD = 2 // 不到2点不刷新
 
     /**
+     * 节目单空闲时自动刷新
+     */
+    const val EPG_REFRESH_IDLE_ENABLE = false
+
+    /**
+     * 节目单空闲刷新延迟（毫秒）
+     */
+    const val EPG_REFRESH_IDLE_DELAY = 1000L * 60 * 30 // 30分钟
+
+    /**
      * Git最新版本信息
      */
     val GIT_RELEASE_LATEST_URL = mapOf(

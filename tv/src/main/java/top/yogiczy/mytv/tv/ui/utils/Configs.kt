@@ -96,6 +96,12 @@ object Configs {
         /** 节目预约列表 */
         EPG_CHANNEL_RESERVE_LIST,
 
+        /** 节目单空闲时刷新 */
+        EPG_REFRESH_IDLE_ENABLE,
+
+        /** 节目单空闲刷新延迟 */
+        EPG_REFRESH_IDLE_DELAY,
+
         /** ==================== 界面 ==================== */
         /** 显示节目进度 */
         UI_SHOW_EPG_PROGRAMME_PROGRESS,
@@ -310,6 +316,16 @@ object Configs {
             )
         )
         set(value) = SP.putString(KEY.EPG_CHANNEL_RESERVE_LIST.name, Json.encodeToString(value))
+
+    /** 节目单空闲时刷新 */
+    var epgRefreshIdleEnable: Boolean
+        get() = SP.getBoolean(KEY.EPG_REFRESH_IDLE_ENABLE.name, Constants.EPG_REFRESH_IDLE_ENABLE)
+        set(value) = SP.putBoolean(KEY.EPG_REFRESH_IDLE_ENABLE.name, value)
+
+    /** 节目单空闲刷新延迟 */
+    var epgRefreshIdleDelay: Long
+        get() = SP.getLong(KEY.EPG_REFRESH_IDLE_DELAY.name, Constants.EPG_REFRESH_IDLE_DELAY)
+        set(value) = SP.putLong(KEY.EPG_REFRESH_IDLE_DELAY.name, value)
 
     /** ==================== 界面 ==================== */
     /** 显示节目进度 */

@@ -5,6 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -55,6 +57,7 @@ import top.yogiczy.mytv.tv.ui.utils.handleKeyEvents
 fun MainContent(
     modifier: Modifier = Modifier,
     onBackPressed: () -> Unit = {},
+    onUserInteraction: () -> Unit = {},
     channelGroupListProvider: () -> ChannelGroupList = { ChannelGroupList() },
     filteredChannelGroupListProvider: () -> ChannelGroupList = { ChannelGroupList() },
     epgListProvider: () -> EpgList = { EpgList() },
@@ -96,6 +99,18 @@ fun MainContent(
 
     Box(
         modifier = modifier
+            .onPreviewKeyEvent {
+                onUserInteraction()
+                false
+            }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent()
+                        onUserInteraction()
+                    }
+                }
+            }
             .popupable()
             .captureBackKey {
                 if(mainContentState.currentPlaybackEpgProgramme!=null){
