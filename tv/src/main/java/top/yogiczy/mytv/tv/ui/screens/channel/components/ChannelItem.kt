@@ -92,7 +92,7 @@ fun ChannelItem(
                         )
                         .height(50.dp)
                         .fillMaxWidth()
-                        .padding(8.dp),
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     ChannelItemLogo(
                         modifier = Modifier.align(Alignment.Center),

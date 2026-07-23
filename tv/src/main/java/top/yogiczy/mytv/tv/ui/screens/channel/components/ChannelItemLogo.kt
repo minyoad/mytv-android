@@ -1,9 +1,11 @@
 package top.yogiczy.mytv.tv.ui.screens.channel.components
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,8 +20,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import top.yogiczy.mytv.core.data.utils.Logger
 import kotlin.math.abs
 
 @Composable
@@ -28,27 +31,51 @@ fun ChannelItemLogo(
     logoProvider: () -> String?,
     textFallbackProvider: () -> String? = { null },
 ) {
+    val log = remember { Logger.create("ChannelItemLogo") }
     val logo = logoProvider()
     val textFallback = textFallbackProvider()
-    var isError by remember(logo) { mutableStateOf(false) }
 
-    if (logo.isNullOrBlank() || isError) {
-        if (!textFallback.isNullOrBlank()) {
-            ChannelItemLogoFallback(
-                modifier = modifier,
-                text = textFallback,
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .aspectRatio(1f),
+        contentAlignment = Alignment.Center
+    ) {
+        if (logo.isNullOrBlank()) {
+            if (!textFallback.isNullOrBlank()) {
+                ChannelItemLogoFallback(
+                    modifier = Modifier.fillMaxSize(),
+                    text = textFallback,
+                )
+            }
+        } else {
+            SubcomposeAsyncImage(
+                modifier = Modifier.fillMaxSize(),
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(logo)
+                    .allowHardware(false)
+                    .bitmapConfig(Bitmap.Config.ARGB_8888)
+                    .build(),
+                contentDescription = null,
+                loading = {
+                    if (!textFallback.isNullOrBlank()) {
+                        ChannelItemLogoFallback(
+                            modifier = Modifier.fillMaxSize(),
+                            text = textFallback,
+                        )
+                    }
+                },
+                error = {
+                    log.e("加载Logo失败: $logo, 原因: ${it.result.throwable.message}")
+                    if (!textFallback.isNullOrBlank()) {
+                        ChannelItemLogoFallback(
+                            modifier = Modifier.fillMaxSize(),
+                            text = textFallback,
+                        )
+                    }
+                }
             )
         }
-    } else {
-        AsyncImage(
-            modifier = modifier,
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(logo)
-                .crossfade(true)
-                .build(),
-            contentDescription = null,
-            onError = { isError = true }
-        )
     }
 }
 

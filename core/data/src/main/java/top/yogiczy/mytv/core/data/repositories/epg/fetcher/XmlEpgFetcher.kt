@@ -1,8 +1,7 @@
 package top.yogiczy.mytv.core.data.repositories.epg.fetcher
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import okhttp3.Response
+import top.yogiczy.mytv.core.data.repositories.epg.fetcher.EpgFetcher.Companion.fetchText
 
 /**
  * 节目单xml数据获取
@@ -12,7 +11,5 @@ class XmlEpgFetcher : EpgFetcher {
         return url.endsWith(".xml")
     }
 
-    override suspend fun fetch(response: Response) = withContext(Dispatchers.IO) {
-        response.body!!.string()
-    }
+    override suspend fun fetch(response: Response) = response.fetchText()
 }

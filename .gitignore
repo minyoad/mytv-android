@@ -27,3 +27,4 @@ keystore.jks
 /release
 app/build/
 .vscode/
+/.artifacts/

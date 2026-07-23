@@ -102,6 +102,7 @@ dependencies {
     implementation(libs.qrose)
 
     implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
 
     implementation(libs.okhttp)
     implementation(libs.androidasync)

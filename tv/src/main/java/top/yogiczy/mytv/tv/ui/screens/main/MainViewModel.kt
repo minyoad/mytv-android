@@ -1,7 +1,11 @@
 package top.yogiczy.mytv.tv.ui.screens.main
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import coil.imageLoader
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
@@ -86,6 +90,22 @@ class MainViewModel : ViewModel() {
     fun onUserInteraction() {
         viewModelScope.launch {
             userInteractionFlow.emit(Unit)
+        }
+    }
+
+    fun preloadLogos(context: Context, channelGroupList: ChannelGroupList) {
+        if (!Configs.uiShowChannelLogo) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            channelGroupList.channelList.forEach { channel ->
+                if (!channel.logo.isNullOrBlank()) {
+                    val request = ImageRequest.Builder(context)
+                        .data(channel.logo)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .build()
+                    context.imageLoader.enqueue(request)
+                }
+            }
         }
     }
 

@@ -55,12 +55,20 @@ fun MainScreen(
 ) {
     val uiState by mainViewModel.uiState.collectAsState()
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(settingsViewModel.epgRefreshIdleEnable, settingsViewModel.epgRefreshIdleDelay) {
         mainViewModel.setIdleSettings(
             settingsViewModel.epgRefreshIdleEnable,
             settingsViewModel.epgRefreshIdleDelay
         )
+    }
+
+    LaunchedEffect(uiState) {
+        val s = uiState
+        if (s is MainUiState.Ready) {
+            mainViewModel.preloadLogos(context, s.channelGroupList)
+        }
     }
 
     DisposableEffect(lifecycleOwner) {

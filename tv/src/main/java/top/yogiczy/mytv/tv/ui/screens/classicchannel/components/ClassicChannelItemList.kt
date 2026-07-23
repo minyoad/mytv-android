@@ -220,14 +220,14 @@ private fun ClassicChannelItem(
     }
 
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (showChannelLogoProvider()) {
             Box(
                 modifier = Modifier
                     .height(40.dp)
-                    .aspectRatio(1.6f),
+                    .aspectRatio(1f),
                 contentAlignment = Alignment.Center
             ) {
                 ChannelItemLogo(

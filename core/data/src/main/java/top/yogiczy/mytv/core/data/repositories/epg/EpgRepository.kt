@@ -38,6 +38,12 @@ class EpgRepository(
         xmlString: String,
         filteredChannels: List<String> = emptyList(),
     ) = withContext(Dispatchers.Default) {
+        if (xmlString.trim().startsWith("<html", ignoreCase = true) ||
+            xmlString.trim().startsWith("<!DOCTYPE html", ignoreCase = true)
+        ) {
+            throw Exception("无法解析节目单：返回内容为HTML，可能是由于网络拦截或源地址失效")
+        }
+
         val dateFormat = SimpleDateFormat("yyyyMMddHHmmss Z", Locale.getDefault())
         val lowerFilteredChannels = filteredChannels.map { it.lowercase() }
         val parser = Xml.newPullParser().apply {
@@ -45,8 +51,8 @@ class EpgRepository(
             setInput(StringReader(xmlString))
         }
 
-        val epgMap = mutableMapOf<String, Epg>()
-        var currentChannelId: String? = null
+        val channelNameMap = mutableMapOf<String, String>()
+        val programmeMap = mutableMapOf<String, MutableList<EpgProgramme>>()
 
         fun getSafeText(): String {
             return try {
@@ -63,55 +69,71 @@ class EpgRepository(
 
         while (parser.next() != XmlPullParser.END_DOCUMENT) {
             try {
-                when (parser.eventType) {
-                    XmlPullParser.START_TAG -> when (parser.name) {
-                        "channel" -> {
-                            currentChannelId = parser.getAttributeValue(null, "id")
-                            parser.nextTag()
-                            val channelName = getSafeText()
-//                            log.d("解析频道: id=$currentChannelId, name=$channelName")  // 添加日志
+                if (parser.eventType != XmlPullParser.START_TAG) continue
 
-                            if (lowerFilteredChannels.isEmpty() ||
-                                channelName.lowercase() in lowerFilteredChannels) {
-                                epgMap[currentChannelId] = Epg(channelName, EpgProgrammeList())
+                when (parser.name) {
+                    "channel" -> {
+                        val id = parser.getAttributeValue(null, "id")
+                        if (id == null) {
+                            skip(parser)
+                            continue
+                        }
+
+                        var name = ""
+                        val depth = parser.depth
+                        while (!(parser.next() == XmlPullParser.END_TAG && parser.depth == depth)) {
+                            if (parser.eventType == XmlPullParser.START_TAG && parser.name == "display-name") {
+                                name = getSafeText()
                             }
                         }
-                        "programme" -> {
-                            val channelId = parser.getAttributeValue(null, "channel")
-                            val startTime = parser.getAttributeValue(null, "start")
-                            val stopTime = parser.getAttributeValue(null, "stop")
-                            parser.nextTag()
-                            val title = getSafeText()
-//                            log.i("解析节目: channelId=$channelId, start=$startTime, stop=$stopTime, title=$title")  // 添加日志
 
-                            epgMap[channelId]?.let { epg ->
-                                val startAt = dateFormat.parse(startTime)?.time ?: 0
-                                val endAt = dateFormat.parse(stopTime)?.time ?: 0
-                                if (startAt == 0L || endAt == 0L) {
-                                    log.w("节目时间解析失败: start=$startTime, stop=$stopTime")
-                                }
+                        if (name.isNotEmpty()) {
+                            if (lowerFilteredChannels.isEmpty() || name.lowercase() in lowerFilteredChannels) {
+                                channelNameMap[id] = name
+                            }
+                        }
+                    }
 
+                    "programme" -> {
+                        val channelId = parser.getAttributeValue(null, "channel")
+                        val startTime = parser.getAttributeValue(null, "start")
+                        val stopTime = parser.getAttributeValue(null, "stop")
+
+                        if (channelId == null || !channelNameMap.containsKey(channelId)) {
+                            skip(parser)
+                            continue
+                        }
+
+                        var title = ""
+                        val depth = parser.depth
+                        while (!(parser.next() == XmlPullParser.END_TAG && parser.depth == depth)) {
+                            if (parser.eventType == XmlPullParser.START_TAG && parser.name == "title") {
+                                title = getSafeText()
+                            }
+                        }
+
+                        if (title.isNotEmpty()) {
+                            val startAt = dateFormat.parse(startTime)?.time ?: 0L
+                            val endAt = dateFormat.parse(stopTime)?.time ?: 0L
+
+                            if (startAt != 0L && endAt != 0L) {
                                 val newProgramme = EpgProgramme(
                                     startAt = startAt,
                                     endAt = endAt,
                                     title = title
                                 )
 
+                                val programmes = programmeMap.getOrPut(channelId) { mutableListOf() }
+
                                 // 检查是否已存在相同时间的节目或者开始时间在其他节目结束时间之前
-                                val isDuplicate = epg.programmeList.any { prog ->
+                                val isDuplicate = programmes.any { prog ->
                                     timeFormat.format(prog.startAt) == timeFormat.format(newProgramme.startAt) ||
                                             newProgramme.startAt < prog.endAt && newProgramme.endAt > prog.startAt
                                 }
 
                                 if (!isDuplicate) {
-                                    epgMap[channelId] = epg.copy(
-                                        programmeList = epg.programmeList + newProgramme
-                                    )
-                                } else {
-                                    log.d("发现重复节目: ${newProgramme.title} (${timeFormat.format(newProgramme.startAt)})")
+                                    programmes.add(newProgramme)
                                 }
-                            } ?: run {
-//                                log.w("节目所属频道未找到: channelId=$channelId")
                             }
                         }
                     }
@@ -122,8 +144,25 @@ class EpgRepository(
             }
         }
 
-        log.i("解析节目单完成，共${epgMap.size}个频道，${epgMap.values.sumOf { it.programmeList.size }}个节目")
-        EpgList(epgMap.values.toList())
+        val epgList = channelNameMap.map { (id, name) ->
+            Epg(name, EpgProgrammeList(programmeMap[id] ?: emptyList()))
+        }
+
+        log.i("解析节目单完成，共${epgList.size}个频道，${epgList.sumOf { it.programmeList.size }}个节目")
+        EpgList(epgList)
+    }
+
+    private fun skip(parser: XmlPullParser) {
+        if (parser.eventType != XmlPullParser.START_TAG) {
+            return
+        }
+        var depth = 1
+        while (depth != 0) {
+            when (parser.next()) {
+                XmlPullParser.END_TAG -> depth--
+                XmlPullParser.START_TAG -> depth++
+            }
+        }
     }
 
     // Add this helper function to your project

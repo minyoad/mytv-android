@@ -63,14 +63,14 @@ fun ChannelInfo(
 
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Top,
     ) {
         if (showChannelLogoProvider()) {
             ChannelItemLogo(
                 modifier = Modifier
                     .height(64.dp)
-                    .aspectRatio(16 / 9f),
+                    .aspectRatio(1f),
                 logoProvider = { channelProvider().logo },
                 textFallbackProvider = { channelProvider().name },
             )

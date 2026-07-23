@@ -7,6 +7,7 @@ import top.yogiczy.mytv.core.data.entities.channel.ChannelGroup
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelList
 import top.yogiczy.mytv.core.data.utils.Constants
+import java.net.URLEncoder
 
 /**
  * txt直播源解析
@@ -46,12 +47,13 @@ class TxtIptvParser : IptvParser {
             ChannelGroup(
                 name = groupEntry.key,
                 channelList = ChannelList(groupEntry.value.groupBy { it.name }.map { nameEntry ->
+                    val channelName = nameEntry.value.first().channelName
+                    
                     Channel(
                         name = nameEntry.key,
-                        epgName = nameEntry.value.first().channelName,
+                        epgName = channelName,
                         urlList = nameEntry.value.map { it.url }.distinct(),
-                        logo = Constants.CHANNEL_LOGO_SOURCE+"${nameEntry.value.first().channelName.replace(" ", "_").replace("+", "_")}.png"
-//                        logo = "https://live.fanmingming.com/tv/${nameEntry.value.first().channelName}.png"
+                        logo = "${Constants.CHANNEL_LOGO_SOURCE}${channelName}.png"
                     )
                 }),
             )
