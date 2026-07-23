@@ -52,6 +52,10 @@ object Constants {
                 url = "https://iptv-cdn.mybacc.com/list/movies.txt",
 //                url = GITHUB_PROXY+"https://raw.githubusercontent.com/minyoad/my-iptv/refs/heads/master/list/movies.txt",
             ),
+            IptvSource(
+                name = "测试直播源-iptvs",
+                url = "https://iptvs.mybacc.com/api/export/m3u?status=active",
+            ),
         )
     )
 

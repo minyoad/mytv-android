@@ -76,11 +76,14 @@ class IptvRepository(
 
             // 在获取到频道列表后，统一生成频道id
             idGenerator.reset()
-            val groupListWithIds = ChannelGroupList(groupList.map { group ->
-                group.copy(channelList = ChannelList(group.channelList.map { channel ->
-                    channel.copy(id = idGenerator.nextId().toString())
-                }))
-            })
+            val groupListWithIds = ChannelGroupList(
+                value = groupList.map { group ->
+                    group.copy(channelList = ChannelList(group.channelList.map { channel ->
+                        channel.copy(id = idGenerator.nextId().toString())
+                    }))
+                },
+                epgUrl = groupList.epgUrl,
+            )
 
             log.i(
                 listOf(

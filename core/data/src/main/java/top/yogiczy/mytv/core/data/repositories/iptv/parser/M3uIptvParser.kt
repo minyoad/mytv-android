@@ -20,6 +20,14 @@ class M3uIptvParser : IptvParser {
         val lines = data.split("\r\n", "\n")
         val iptvList = mutableListOf<IptvResponseItem>()
 
+        var epgUrl: String? = null
+        val header = lines.firstOrNull { it.startsWith("#EXTM3U") }
+        if (header != null) {
+            epgUrl = (Regex("x-tvg-url=\"(.+?)\"").find(header)?.groupValues?.get(1)
+                ?: Regex("url-tvg=\"(.+?)\"").find(header)?.groupValues?.get(1))
+                ?.split(",")?.firstOrNull()?.trim()
+        }
+
         lines.forEachIndexed { index, line ->
             if (!line.startsWith("#EXTINF")) return@forEachIndexed
 
@@ -29,6 +37,7 @@ class M3uIptvParser : IptvParser {
             val groupName = Regex("group-title=\"(.+?)\"").find(line)?.groupValues?.get(1)?.trim()
                 ?: "其他"
             val logo = Regex("tvg-logo=\"(.+?)\"").find(line)?.groupValues?.get(1)?.trim()
+                ?: Regex("logo=\"(.+?)\"").find(line)?.groupValues?.get(1)?.trim()
             val url = lines.getOrNull(index + 1)?.trim()
 
             url?.let {
@@ -44,19 +53,22 @@ class M3uIptvParser : IptvParser {
             }
         }
 
-        return@withContext ChannelGroupList(iptvList.groupBy { it.groupName }.map { groupEntry ->
-            ChannelGroup(
-                name = groupEntry.key,
-                channelList = ChannelList(groupEntry.value.groupBy { it.name }.map { nameEntry ->
-                    Channel(
-                        name = nameEntry.key,
-                        epgName = nameEntry.value.first().channelName,
-                        urlList = nameEntry.value.map { it.url }.distinct(),
-                        logo = nameEntry.value.first().logo
-                    )
-                })
-            )
-        })
+        return@withContext ChannelGroupList(
+            value = iptvList.groupBy { it.groupName }.map { groupEntry ->
+                ChannelGroup(
+                    name = groupEntry.key,
+                    channelList = ChannelList(groupEntry.value.groupBy { it.name }.map { nameEntry ->
+                        Channel(
+                            name = nameEntry.key,
+                            epgName = nameEntry.value.first().channelName,
+                            urlList = nameEntry.value.map { it.url }.distinct(),
+                            logo = nameEntry.value.first().logo
+                        )
+                    })
+                )
+            },
+            epgUrl = epgUrl,
+        )
     }
 
     private data class IptvResponseItem(

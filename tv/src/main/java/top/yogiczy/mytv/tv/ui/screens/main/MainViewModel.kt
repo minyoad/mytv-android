@@ -27,6 +27,7 @@ import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelList
 import top.yogiczy.mytv.core.data.entities.epg.EpgList
+import top.yogiczy.mytv.core.data.entities.epgsource.EpgSource
 import top.yogiczy.mytv.core.data.repositories.epg.EpgRepository
 import top.yogiczy.mytv.core.data.repositories.iptv.IptvRepository
 import top.yogiczy.mytv.core.data.utils.ChannelUtil
@@ -167,27 +168,33 @@ class MainViewModel : ViewModel() {
             return@withContext when (hybridMode) {
                 Configs.IptvHybridMode.DISABLE -> channelGroupList
                 Configs.IptvHybridMode.IPTV_FIRST -> {
-                    ChannelGroupList(channelGroupList.map { group ->
-                        group.copy(channelList = ChannelList(group.channelList.map { channel ->
-                            channel.copy(
-                                urlList = channel.urlList.plus(
-                                    ChannelUtil.getHybridWebViewUrl(channel.name) ?: emptyList()
+                    ChannelGroupList(
+                        value = channelGroupList.map { group ->
+                            group.copy(channelList = ChannelList(group.channelList.map { channel ->
+                                channel.copy(
+                                    urlList = channel.urlList.plus(
+                                        ChannelUtil.getHybridWebViewUrl(channel.name) ?: emptyList()
+                                    )
                                 )
-                            )
-                        }))
-                    })
+                            }))
+                        },
+                        epgUrl = channelGroupList.epgUrl,
+                    )
                 }
 
                 Configs.IptvHybridMode.HYBRID_FIRST -> {
-                    ChannelGroupList(channelGroupList.map { group ->
-                        group.copy(channelList = ChannelList(group.channelList.map { channel ->
-                            channel.copy(
-                                urlList = (ChannelUtil.getHybridWebViewUrl(channel.name)
-                                    ?: emptyList())
-                                    .plus(channel.urlList)
-                            )
-                        }))
-                    })
+                    ChannelGroupList(
+                        value = channelGroupList.map { group ->
+                            group.copy(channelList = ChannelList(group.channelList.map { channel ->
+                                channel.copy(
+                                    urlList = (ChannelUtil.getHybridWebViewUrl(channel.name)
+                                        ?: emptyList())
+                                        .plus(channel.urlList)
+                                )
+                            }))
+                        },
+                        epgUrl = channelGroupList.epgUrl,
+                    )
                 }
             }
         }
@@ -200,8 +207,15 @@ class MainViewModel : ViewModel() {
             val channelGroupList = (_uiState.value as MainUiState.Ready).channelGroupList
 
             flow {
+                val epgUrl = channelGroupList.epgUrl
+                val epgSource = if (!epgUrl.isNullOrBlank()) {
+                    EpgSource(name = "直播源自带", url = epgUrl)
+                } else {
+                    Configs.epgSourceCurrent
+                }
+
                 emit(
-                    EpgRepository(Configs.epgSourceCurrent).getEpgList(
+                    EpgRepository(epgSource).getEpgList(
                         filteredChannels = channelGroupList.channelList.map { it.epgName },
                         refreshTimeThreshold = Configs.epgRefreshTimeThreshold,
                     )
