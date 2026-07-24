@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Manual update for tag (empty for latest stable)'
+        required: false
+        default: ''
 
 jobs:
   update_json:
@@ -17,74 +22,68 @@ jobs:
           fetch-depth: 0
           path: mytv-android-update
 
-      - name: Get latest release
-        id: latest_release
-        uses: octokit/request-action@v2.x
+      - name: Get Release Data
+        id: release_data
+        uses: actions/github-script@v6
         with:
-          route: GET /repos/{owner}/{repo}/releases/latest
-          owner: ${{ github.repository_owner }}
-          repo: ${{ github.event.repository.name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            let release;
+            if (context.eventName === 'release') {
+              release = context.payload.release;
+            } else {
+              const tagName = context.payload.inputs.tag_name;
+              if (tagName) {
+                const response = await github.rest.repos.getReleaseByTag({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  tag: tagName,
+                });
+                release = response.data;
+              } else {
+                const response = await github.rest.repos.getLatestRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                });
+                release = response.data;
+              }
+            }
+            
+            const isBeta = release.prerelease || release.tag_name.includes('beta');
+            const targetFile = isBeta ? 'tv-beta.json' : 'tv-stable.json';
+            
+            core.setOutput('tag_name', release.tag_name);
+            core.setOutput('asset_url', release.assets[0].browser_download_url);
+            core.setOutput('body', release.body);
+            core.setOutput('target_file', targetFile);
+            core.setOutput('is_beta', isBeta);
 
-      - name: Update tv-stable.json
+      - name: Update JSON File
         id: update_json
         working-directory: ./mytv-android-update
         run: |
-          echo "Current working directory: $(pwd)"
-          echo "Directory contents:"
-          ls -la
-
-          RELEASE_DATA='${{ steps.latest_release.outputs.data }}'
-          echo "Raw release data: $RELEASE_DATA"
+          TAG_NAME="${{ steps.release_data.outputs.tag_name }}"
+          ASSET_URL="${{ steps.release_data.outputs.asset_url }}"
+          BODY="${{ steps.release_data.outputs.body }}"
+          TARGET_FILE="${{ steps.release_data.outputs.target_file }}"
           
-          if [ -z "$RELEASE_DATA" ]; then
-            echo "Error: Release data is empty"
-            exit 1
-          fi
-          
-          TAG_NAME=$(echo $RELEASE_DATA | jq -r '.tag_name // empty')
-          ASSET_URL=$(echo $RELEASE_DATA | jq -r '.assets[0].browser_download_url // empty')
-          BODY=$(echo $RELEASE_DATA | jq -r '.body // empty')
-          
-          echo "Tag Name: $TAG_NAME"
-          echo "Asset URL: $ASSET_URL"
-          echo "Body: $BODY"
-          
-          if [ -z "$TAG_NAME" ] || [ -z "$ASSET_URL" ]; then
-            echo "Error: Failed to extract required information from release data"
-            exit 1
-          fi
+          echo "Updating $TARGET_FILE for version $TAG_NAME"
 
           NEW_CONTENT=$(jq -n --arg tag "$TAG_NAME" \
                            --arg url "$ASSET_URL" \
                            --arg body "$BODY" \
                            '{tag_name: $tag, assets: [{browser_download_url: $url}], body: $body}')
           
-          echo "New content:"
-          echo "$NEW_CONTENT" | jq '.'
-          
-          echo "Writing new content to tv-stable.json"
-          echo "$NEW_CONTENT" > tv-stable.json
-          
-          echo "Verifying tv-stable.json content:"
-          cat tv-stable.json
-          
-          echo "File size of tv-stable.json:"
-          ls -l tv-stable.json
-          
-          echo "update_needed=true" >> $GITHUB_OUTPUT
+          echo "$NEW_CONTENT" > "$TARGET_FILE"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "target_file=$TARGET_FILE" >> $GITHUB_OUTPUT
 
       - name: Commit and push changes
         working-directory: ./mytv-android-update
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add tv-stable.json
-          git status
-          git diff --cached
-          git commit -m "Update tv-stable.json to version ${{ steps.update_json.outputs.tag_name }}"
+          git add "${{ steps.update_json.outputs.target_file }}"
+          git commit -m "Update ${{ steps.update_json.outputs.target_file }} to version ${{ steps.update_json.outputs.tag_name }}" || echo "No changes to commit"
           git push
-          echo "Changes pushed to repository"
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}

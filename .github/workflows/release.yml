@@ -79,20 +79,16 @@ jobs:
           echo "Found APK: $apk_path"
           echo "apk_path=$apk_path" >> $GITHUB_OUTPUT
 
-      # 8. 校验 TAG 格式 (放宽限制，允许 beta/rc 等后缀)
-      - name: Check TAG validity
+      # 8. 检测是否为 Beta 版本
+      - name: Check if Beta
+        id: check_beta
         run: |
-          tag="${{ env.TAG }}"
-          if [[ -z "$tag" ]]; then
-            echo "❌ TAG is empty."
-            exit 1
+          if [[ "${{ env.TAG }}" == *"beta"* ]]; then
+            echo "is_beta=true" >> $GITHUB_OUTPUT
+            echo "📢 Detected Beta release"
+          else
+            echo "is_beta=false" >> $GITHUB_OUTPUT
           fi
-          # 只要以 v 开头即可，避免过于严格的正则导致失败
-          if [[ ! "$tag" =~ ^v.*$ ]]; then
-            echo "❌ TAG 格式警告: 建议以 'v' 开头 (当前: $tag)"
-            # 这里可以选择 exit 1 报错，或者仅警告
-          fi
-          echo "TAG=$tag" >> $GITHUB_ENV
 
       # 9. 发布到 GitHub Release (自动创建或更新)
       - name: Upload Release Asset
@@ -102,7 +98,7 @@ jobs:
           tag_name: ${{ env.TAG }}
           name: ${{ env.TAG }}
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.check_beta.outputs.is_beta == 'true' }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
