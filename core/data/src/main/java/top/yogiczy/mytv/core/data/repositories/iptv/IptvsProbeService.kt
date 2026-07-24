@@ -1,19 +1,46 @@
 package top.yogiczy.mytv.core.data.repositories.iptv
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import top.yogiczy.mytv.core.data.network.OkHttp
 import top.yogiczy.mytv.core.data.utils.Logger
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+
+@OptIn(InternalSerializationApi::class)
+@Serializable
+data class SimpleChannel(val id: String, val name: String, val sources: List<SimpleSource>)
+
+@OptIn(InternalSerializationApi::class)
+@Serializable
+data class SimpleSource(val id: String, val url: String)
+
+@OptIn(InternalSerializationApi::class)
+@Serializable
+data class ProbeResult(val sourceId: String, val channelId: String, val status: String, val latency: Long)
+
+@OptIn(InternalSerializationApi::class)
+@Serializable
+data class ReportPayload(val clientIsp: String, val clientProvince: String, val results: List<ProbeResult>)
+
+@OptIn(InternalSerializationApi::class)
+@Serializable
+data class ReportResponse(val count: Int)
 
 /**
  * IPTVS 线路探测服务
@@ -30,17 +57,6 @@ object IptvsProbeService {
         coerceInputValues = true
     }
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
-
-    @Serializable
-    data class SimpleChannel(val id: String, val name: String, val sources: List<SimpleSource>)
-    @Serializable
-    data class SimpleSource(val id: String, val url: String)
-    @Serializable
-    data class ProbeResult(val sourceId: String, val channelId: String, val status: String, val latency: Long)
-    @Serializable
-    data class ReportPayload(val clientIsp: String, val clientProvince: String, val results: List<ProbeResult>)
-    @Serializable
-    data class ReportResponse(val count: Int)
 
     /**
      * 开始探测任务

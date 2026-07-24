@@ -6,6 +6,7 @@ import top.yogiczy.mytv.core.data.entities.channel.Channel
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroup
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelList
+import top.yogiczy.mytv.core.util.utils.removeBom
 
 /**
  * m3u直播源解析
@@ -13,18 +14,20 @@ import top.yogiczy.mytv.core.data.entities.channel.ChannelList
 class M3uIptvParser : IptvParser {
 
     override fun isSupport(url: String, data: String): Boolean {
-        return data.startsWith("#EXTM3U")
+        return data.removeBom().startsWith("#EXTM3U")
     }
 
     override suspend fun parse(data: String): ChannelGroupList = withContext(Dispatchers.Default) {
-        val lines = data.split("\r\n", "\n")
+        val cleanData = data.removeBom()
+        val lines = cleanData.split("\r\n", "\n")
         val iptvList = mutableListOf<IptvResponseItem>()
 
         var epgUrl: String? = null
         val header = lines.firstOrNull { it.startsWith("#EXTM3U") }
         if (header != null) {
-            epgUrl = (Regex("x-tvg-url=\"(.+?)\"").find(header)?.groupValues?.get(1)
-                ?: Regex("url-tvg=\"(.+?)\"").find(header)?.groupValues?.get(1))
+            epgUrl = (Regex("x-tvg-url=\"?(.+?)\"?(?:\\s|$)").find(header)?.groupValues?.get(1)
+                ?: Regex("url-tvg=\"?(.+?)\"?(?:\\s|$)").find(header)?.groupValues?.get(1)
+                ?: Regex("tvg-url=\"?(.+?)\"?(?:\\s|$)").find(header)?.groupValues?.get(1))
                 ?.split(",")?.firstOrNull()?.trim()
         }
 
@@ -32,12 +35,12 @@ class M3uIptvParser : IptvParser {
             if (!line.startsWith("#EXTINF")) return@forEachIndexed
 
             val name = line.split(",").last().trim()
-            val channelName = Regex("tvg-name=\"(.+?)\"").find(line)?.groupValues?.get(1)?.trim()
+            val channelName = Regex("tvg-name=\"?(.+?)\"?(?:\\s|,)").find(line)?.groupValues?.get(1)?.trim()
                 ?: name
-            val groupName = Regex("group-title=\"(.+?)\"").find(line)?.groupValues?.get(1)?.trim()
+            val groupName = Regex("group-title=\"?(.+?)\"?(?:\\s|,)").find(line)?.groupValues?.get(1)?.trim()
                 ?: "其他"
-            val logo = Regex("tvg-logo=\"(.+?)\"").find(line)?.groupValues?.get(1)?.trim()
-                ?: Regex("logo=\"(.+?)\"").find(line)?.groupValues?.get(1)?.trim()
+            val logo = Regex("tvg-logo=\"?(.+?)\"?(?:\\s|,)").find(line)?.groupValues?.get(1)?.trim()
+                ?: Regex("logo=\"?(.+?)\"?(?:\\s|,)").find(line)?.groupValues?.get(1)?.trim()
             val url = lines.getOrNull(index + 1)?.trim()
 
             url?.let {

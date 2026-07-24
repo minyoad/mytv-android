@@ -11,6 +11,7 @@ import top.yogiczy.mytv.core.data.network.await
 import top.yogiczy.mytv.core.data.repositories.FileCacheRepository
 import top.yogiczy.mytv.core.data.repositories.iptv.parser.IptvParser
 import top.yogiczy.mytv.core.data.utils.Logger
+import top.yogiczy.mytv.core.util.utils.removeBom
 
 
 class IdGenerator {
@@ -66,9 +67,10 @@ class IptvRepository(
      */
     suspend fun getChannelGroupList(cacheTime: Long): ChannelGroupList {
         try {
-            val sourceData = getOrRefresh(if (source.isLocal) Long.MAX_VALUE else cacheTime) {
+            val rawData = getOrRefresh(if (source.isLocal) Long.MAX_VALUE else cacheTime) {
                 fetchSource(source.url)
             }
+            val sourceData = rawData.removeBom()
 
             val parser = IptvParser.instances.first { it.isSupport(source.url, sourceData) }
             val startTime = System.currentTimeMillis()

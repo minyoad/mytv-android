@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
@@ -33,12 +32,14 @@ import top.yogiczy.mytv.core.data.repositories.iptv.IptvRepository
 import top.yogiczy.mytv.core.data.repositories.iptv.IptvsProbeService
 import top.yogiczy.mytv.core.data.utils.ChannelUtil
 import top.yogiczy.mytv.core.data.utils.Constants
+import top.yogiczy.mytv.core.data.utils.Logger
 import top.yogiczy.mytv.tv.ui.material.Snackbar
 import top.yogiczy.mytv.tv.ui.material.SnackbarType
 import top.yogiczy.mytv.tv.ui.utils.Configs
 import java.time.LocalDate
 
 class MainViewModel : ViewModel() {
+    private val log = Logger.create(javaClass.simpleName)
     private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Loading())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
@@ -223,8 +224,10 @@ class MainViewModel : ViewModel() {
             flow {
                 val epgUrl = channelGroupList.epgUrl
                 val epgSource = if (!epgUrl.isNullOrBlank()) {
+                    log.i("优先使用直播源自带节目单: $epgUrl")
                     EpgSource(name = "直播源自带", url = epgUrl)
                 } else {
+                    log.i("使用系统设置节目单: ${Configs.epgSourceCurrent.url}")
                     Configs.epgSourceCurrent
                 }
 

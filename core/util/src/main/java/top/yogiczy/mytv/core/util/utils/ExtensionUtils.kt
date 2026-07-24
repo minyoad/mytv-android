@@ -47,3 +47,8 @@ fun String.compareVersion(version2: String): Int {
 
     return comparePreRelease(preRelease1, preRelease2)
 }
+
+fun String.removeBom(): String {
+    val bom = "\uFEFF"
+    return if (this.startsWith(bom)) this.removePrefix(bom) else this
+}

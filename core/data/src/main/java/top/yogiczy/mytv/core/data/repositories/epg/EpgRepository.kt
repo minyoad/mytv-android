@@ -18,6 +18,7 @@ import top.yogiczy.mytv.core.data.network.await
 import top.yogiczy.mytv.core.data.repositories.FileCacheRepository
 import top.yogiczy.mytv.core.data.repositories.epg.fetcher.EpgFetcher
 import top.yogiczy.mytv.core.data.utils.Logger
+import top.yogiczy.mytv.core.util.utils.removeBom
 import java.io.StringReader
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -36,7 +37,6 @@ class EpgRepository(
      */
     private suspend fun parseFromXml(
         xmlString: String,
-        filteredChannels: List<String> = emptyList(),
     ) = withContext(Dispatchers.Default) {
         if (xmlString.trim().startsWith("<html", ignoreCase = true) ||
             xmlString.trim().startsWith("<!DOCTYPE html", ignoreCase = true)
@@ -45,7 +45,6 @@ class EpgRepository(
         }
 
         val dateFormat = SimpleDateFormat("yyyyMMddHHmmss Z", Locale.getDefault())
-        val lowerFilteredChannels = filteredChannels.map { it.lowercase() }
         val parser = Xml.newPullParser().apply {
             setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
             setInput(StringReader(xmlString))
@@ -88,9 +87,7 @@ class EpgRepository(
                         }
 
                         if (name.isNotEmpty()) {
-                            if (lowerFilteredChannels.isEmpty() || name.lowercase() in lowerFilteredChannels) {
-                                channelNameMap[id] = name
-                            }
+                            channelNameMap[id] = name
                         }
                     }
 
@@ -165,15 +162,6 @@ class EpgRepository(
         }
     }
 
-    // Add this helper function to your project
-    fun String.removeBom(): String {
-        val bom = "\uFEFF"
-        if (this.startsWith(bom)) {
-            return this.removePrefix(bom)
-        }
-        return this
-    }
-
     /**
      * 获取节目单列表
      */
@@ -182,11 +170,6 @@ class EpgRepository(
         refreshTimeThreshold: Int,
     ): EpgList = withContext(Dispatchers.Default) {
         try {
-//            if (Calendar.getInstance().get(Calendar.HOUR_OF_DAY) < refreshTimeThreshold) {
-//                log.i("未到时间点，不刷新节目单")
-//                return@withContext EpgList()
-//            }
-
             val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
             val xmlJson = getOrRefresh({ lastModified, cachedContent ->
@@ -194,15 +177,17 @@ class EpgRepository(
                 cachedContent.isNullOrEmpty() || dateFormat.format(System.currentTimeMillis()) != dateFormat.format(lastModified)
             }) {
                 val xmlString = epgXmlRepository.getEpgXml().removeBom()
-                Json.encodeToString(
-                    parseFromXml(
-                        xmlString,
-                        filteredChannels.map { it.lowercase() },
-                    )
-                )
+                Json.encodeToString(parseFromXml(xmlString))
             }
 
-            return@withContext Json.decodeFromString(xmlJson)
+            val epgList: EpgList = Json.decodeFromString(xmlJson)
+            val lowerFilteredChannels = filteredChannels.map { it.lowercase() }
+
+            if (lowerFilteredChannels.isEmpty()) return@withContext epgList
+
+            return@withContext EpgList(epgList.filter { epg ->
+                epg.channel.lowercase() in lowerFilteredChannels
+            })
         } catch (ex: Exception) {
             log.e("获取节目单失败", ex)
             throw Exception(ex)
