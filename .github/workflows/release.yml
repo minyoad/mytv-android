@@ -107,4 +107,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh workflow run update_json.yml --ref main
+          gh workflow run update_json.yml --ref main -f tag_name=${{ env.TAG }}
