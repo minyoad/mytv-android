@@ -226,7 +226,7 @@ private fun ClassicChannelItem(
         if (showChannelLogoProvider()) {
             Box(
                 modifier = Modifier
-                    .height(40.dp)
+                    .height(60.dp)
                     .aspectRatio(1f),
                 contentAlignment = Alignment.Center
             ) {
