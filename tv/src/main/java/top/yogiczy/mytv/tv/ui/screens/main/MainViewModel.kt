@@ -30,6 +30,7 @@ import top.yogiczy.mytv.core.data.entities.epg.EpgList
 import top.yogiczy.mytv.core.data.entities.epgsource.EpgSource
 import top.yogiczy.mytv.core.data.repositories.epg.EpgRepository
 import top.yogiczy.mytv.core.data.repositories.iptv.IptvRepository
+import top.yogiczy.mytv.core.data.repositories.iptv.IptvsProbeService
 import top.yogiczy.mytv.core.data.utils.ChannelUtil
 import top.yogiczy.mytv.core.data.utils.Constants
 import top.yogiczy.mytv.tv.ui.material.Snackbar
@@ -63,6 +64,7 @@ class MainViewModel : ViewModel() {
             }
             refreshChannel()
             refreshEpg()
+            probeIptvs()
         }
     }
 
@@ -132,6 +134,18 @@ class MainViewModel : ViewModel() {
     private fun onChannelChanged() {
         viewModelScope.launch {
             Configs.iptvChannelUrlIdx= emptyMap()
+        }
+    }
+
+    private fun probeIptvs() {
+        val currentSource = Configs.iptvSourceCurrent
+        if (currentSource.url.contains("iptvs.mybacc.com")) {
+            val baseUrl = currentSource.url.split("/api/").first()
+            IptvsProbeService.startProbe(
+                serverBaseUrl = baseUrl,
+                isp = Configs.iptvIptvsIsp,
+                province = Configs.iptvIptvsProvince,
+            )
         }
     }
 

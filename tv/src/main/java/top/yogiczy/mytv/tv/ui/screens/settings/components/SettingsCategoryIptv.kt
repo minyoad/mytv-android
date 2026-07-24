@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -21,9 +22,12 @@ import kotlinx.coroutines.launch
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSourceList
 import top.yogiczy.mytv.core.data.repositories.iptv.IptvRepository
+import top.yogiczy.mytv.core.data.repositories.iptv.IptvsProbeService
+import top.yogiczy.mytv.core.data.utils.Constants
 import top.yogiczy.mytv.core.util.utils.humanizeMs
 import top.yogiczy.mytv.tv.ui.material.LocalPopupManager
 import top.yogiczy.mytv.tv.ui.material.SimplePopup
+import top.yogiczy.mytv.tv.ui.material.Snackbar
 import top.yogiczy.mytv.tv.ui.material.Tag
 import top.yogiczy.mytv.tv.ui.screens.channelgroup.ChannelGroupManageScreen
 import top.yogiczy.mytv.tv.ui.screens.components.SelectDialog
@@ -219,6 +223,92 @@ fun SettingsCategoryIptv(
                         Configs.IptvHybridMode.entries.let { it[(it.indexOf(settingsViewModel.iptvHybridMode) + 1) % it.size] }
                 },
             )
+        }
+
+        if (settingsViewModel.iptvSourceCurrent.url.contains("iptvs.mybacc.com")) {
+            item {
+                val popupManager = LocalPopupManager.current
+                val focusRequester = remember { FocusRequester() }
+                var visible by remember { mutableStateOf(false) }
+
+                SettingsListItem(
+                    modifier = Modifier.focusRequester(focusRequester),
+                    headlineContent = "测速运营商",
+                    supportingContent = "用于匹配对应运营商的优化线路",
+                    trailingContent = settingsViewModel.iptvIptvsIsp,
+                    onSelected = {
+                        popupManager.push(focusRequester, true)
+                        visible = true
+                    },
+                )
+
+                SelectDialog(
+                    visibleProvider = { visible },
+                    onDismissRequest = { visible = false },
+                    title = "测速运营商",
+                    currentDataProvider = { settingsViewModel.iptvIptvsIsp },
+                    dataListProvider = { Constants.IPTVS_ISP_LIST },
+                    dataText = { it },
+                    onDataSelected = {
+                        settingsViewModel.iptvIptvsIsp = it
+                        visible = false
+                    },
+                )
+            }
+
+            item {
+                val popupManager = LocalPopupManager.current
+                val focusRequester = remember { FocusRequester() }
+                var visible by remember { mutableStateOf(false) }
+
+                SettingsListItem(
+                    modifier = Modifier.focusRequester(focusRequester),
+                    headlineContent = "测速省份",
+                    supportingContent = "用于匹配对应省份的本地优化线路",
+                    trailingContent = settingsViewModel.iptvIptvsProvince,
+                    onSelected = {
+                        popupManager.push(focusRequester, true)
+                        visible = true
+                    },
+                )
+
+                SelectDialog(
+                    visibleProvider = { visible },
+                    onDismissRequest = { visible = false },
+                    title = "测速省份",
+                    currentDataProvider = { settingsViewModel.iptvIptvsProvince },
+                    dataListProvider = { Constants.IPTVS_PROVINCE_LIST },
+                    dataText = { it },
+                    onDataSelected = {
+                        settingsViewModel.iptvIptvsProvince = it
+                        visible = false
+                    },
+                )
+            }
+
+            item {
+                var probeCount by remember { mutableIntStateOf(0) }
+
+                SettingsListItem(
+                    headlineContent = "线路更新测试",
+                    supportingContent = if (probeCount > 0) "上次成功生效 $probeCount 条报告" else "并发探测直播线路并回传测速数据",
+                    onSelected = {
+                        val baseUrl = settingsViewModel.iptvSourceCurrent.url.split("/api/").first()
+                        IptvsProbeService.startProbe(
+                            serverBaseUrl = baseUrl,
+                            isp = settingsViewModel.iptvIptvsIsp,
+                            province = settingsViewModel.iptvIptvsProvince,
+                        ) {
+                            probeCount = it
+                            if (it >= 0) {
+                                Snackbar.show("成功回传并在云端秒级生效 $it 条健康线路！")
+                            } else {
+                                Snackbar.show("线路探测启动失败，请检查网络连接")
+                            }
+                        }
+                    },
+                )
+            }
         }
     }
 }

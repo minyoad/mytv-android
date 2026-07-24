@@ -80,6 +80,12 @@ object Configs {
 
         IPTV_CHANNEL_URL_INDEX,
 
+        /** 线路测速 ISP */
+        IPTV_IPTVS_ISP,
+
+        /** 线路测速 省份 */
+        IPTV_IPTVS_PROVINCE,
+
         /** ==================== 节目单 ==================== */
         /** 启用节目单 */
         EPG_ENABLE,
@@ -283,6 +289,16 @@ object Configs {
             SP.getInt(KEY.IPTV_HYBRID_MODE.name, IptvHybridMode.DISABLE.value)
         )
         set(value) = SP.putInt(KEY.IPTV_HYBRID_MODE.name, value.value)
+
+    /** 线路测速 ISP */
+    var iptvIptvsIsp: String
+        get() = SP.getString(KEY.IPTV_IPTVS_ISP.name, "中国电信")
+        set(value) = SP.putString(KEY.IPTV_IPTVS_ISP.name, value)
+
+    /** 线路测速 省份 */
+    var iptvIptvsProvince: String
+        get() = SP.getString(KEY.IPTV_IPTVS_PROVINCE.name, "北京")
+        set(value) = SP.putString(KEY.IPTV_IPTVS_PROVINCE.name, value)
 
     /** ==================== 节目单 ==================== */
     /** 启用节目单 */
