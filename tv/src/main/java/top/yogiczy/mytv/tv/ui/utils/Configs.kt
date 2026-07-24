@@ -86,6 +86,9 @@ object Configs {
         /** 线路测速 省份 */
         IPTV_IPTVS_PROVINCE,
 
+        /** 是否开启自动线路探测 */
+        IPTV_AUTO_PROBE,
+
         /** ==================== 节目单 ==================== */
         /** 启用节目单 */
         EPG_ENABLE,
@@ -299,6 +302,11 @@ object Configs {
     var iptvIptvsProvince: String
         get() = SP.getString(KEY.IPTV_IPTVS_PROVINCE.name, "北京")
         set(value) = SP.putString(KEY.IPTV_IPTVS_PROVINCE.name, value)
+
+    /** 是否开启自动线路探测 */
+    var iptvAutoProbe: Boolean
+        get() = SP.getBoolean(KEY.IPTV_AUTO_PROBE.name, false)
+        set(value) = SP.putBoolean(KEY.IPTV_AUTO_PROBE.name, value)
 
     /** ==================== 节目单 ==================== */
     /** 启用节目单 */

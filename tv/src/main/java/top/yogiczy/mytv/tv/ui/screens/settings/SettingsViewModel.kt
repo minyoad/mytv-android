@@ -209,6 +209,14 @@ class SettingsViewModel : ViewModel() {
             _iptvIptvsProvince = value
             Configs.iptvIptvsProvince = value
         }
+
+    private var _iptvAutoProbe by mutableStateOf(Configs.iptvAutoProbe)
+    var iptvAutoProbe: Boolean
+        get() = _iptvAutoProbe
+        set(value) {
+            _iptvAutoProbe = value
+            Configs.iptvAutoProbe = value
+        }
         
     private var _videoPlayerType by mutableStateOf(Configs.videoPlayerType)
     var videoPlayerType: Configs.VideoPlayerType
@@ -459,6 +467,7 @@ class SettingsViewModel : ViewModel() {
         _iptvHybridMode = Configs.iptvHybridMode
         _iptvIptvsIsp = Configs.iptvIptvsIsp
         _iptvIptvsProvince = Configs.iptvIptvsProvince
+        _iptvAutoProbe = Configs.iptvAutoProbe
         _epgEnable = Configs.epgEnable
         _epgSourceCurrent = Configs.epgSourceCurrent
         _epgSourceList = Configs.epgSourceList

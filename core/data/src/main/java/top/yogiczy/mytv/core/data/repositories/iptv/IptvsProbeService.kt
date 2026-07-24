@@ -20,6 +20,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import top.yogiczy.mytv.core.data.network.OkHttp
 import top.yogiczy.mytv.core.data.utils.Logger
 import java.io.IOException
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.util.concurrent.TimeUnit
 
 @OptIn(InternalSerializationApi::class)
@@ -41,6 +43,11 @@ data class ReportPayload(val clientIsp: String, val clientProvince: String, val 
 @OptIn(InternalSerializationApi::class)
 @Serializable
 data class ReportResponse(val count: Int)
+
+/**
+ * 深度探测函数类型
+ */
+typealias DeepProbeHandler = suspend (url: String) -> Long?
 
 /**
  * IPTVS 线路探测服务
@@ -66,6 +73,7 @@ object IptvsProbeService {
         isp: String,
         province: String,
         onlyActive: Boolean = true,
+        deepProbe: DeepProbeHandler? = null,
         onComplete: (successCount: Int) -> Unit = {}
     ) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -85,11 +93,40 @@ object IptvsProbeService {
                     }
                 }
 
-                log.i("待测物理流: ${allSourcesToTest.size}，开始并发测速...")
-                val testResults = runConcurrentProbe(allSourcesToTest, maxConcurrency = 8)
+                log.i("待测物理流: ${allSourcesToTest.size}，开始并发测速（第一阶段：快速嗅探）...")
+                val fastResults = runConcurrentProbe(allSourcesToTest, maxConcurrency = 4)
 
-                log.i("测速完毕，上报结果: 健康可用 ${testResults.count { it.status == "active" }} 条")
-                val count = submitReport(serverBaseUrl, isp, province, testResults)
+                var finalResults = fastResults
+
+                // 第二阶段：深度验证
+                if (deepProbe != null) {
+                    val activeResults = fastResults.filter { it.status == "active" }
+                    log.i("进入第二阶段：深度验证（对 ${activeResults.size} 条线路进行播放测试）...")
+                    
+                    val deepResults = mutableListOf<ProbeResult>()
+                    // 深度测试为了稳定性，采用低并发
+                    val semaphore = Semaphore(1) 
+                    val deferreds = activeResults.map { res ->
+                        async {
+                            semaphore.withPermit {
+                                val url = allSourcesToTest.find { it.first == res.sourceId }?.third ?: ""
+                                val deepLatency = deepProbe(url)
+                                if (deepLatency != null) {
+                                    res.copy(latency = deepLatency)
+                                } else {
+                                    res.copy(status = "inactive", latency = 9999L)
+                                }
+                            }
+                        }
+                    }
+                    deepResults.addAll(deferreds.awaitAll())
+                    
+                    // 合并结果：保留没进深度测试的（已标记为 inactive 的）和深度测试后的结果
+                    finalResults = fastResults.filter { it.status != "active" } + deepResults
+                }
+
+                log.i("测速完毕，上报结果: 健康可用 ${finalResults.count { it.status == "active" }} 条")
+                val count = submitReport(serverBaseUrl, isp, province, finalResults)
                 log.i("数据上报完成，生效 $count 条报告")
 
                 withContext(Dispatchers.Main) {
@@ -115,6 +152,50 @@ object IptvsProbeService {
         }
     }
 
+    /**
+     * 探测单条 URL (支持 HTTP HEAD 与 TCP 端口探测)
+     */
+    private fun probeUrl(url: String): Pair<String, Long> {
+        val startTime = System.currentTimeMillis()
+        try {
+            if (url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true)) {
+                val headRequest = Request.Builder().url(url).head().build()
+                client.newCall(headRequest).execute().use { response ->
+                    if (response.isSuccessful || response.code in 300..399) {
+                        return "active" to (System.currentTimeMillis() - startTime)
+                    }
+                }
+            } else {
+                // 非 HTTP 协议 (RTSP, RTMP, P3P等)，尝试 TCP 端口探测
+                val regex = Regex("^(\\w+://)?([^:/\\s]+)(:(\\d+))?")
+                val match = regex.find(url)
+                if (match != null) {
+                    val scheme = match.groupValues[1].lowercase().removeSuffix("://")
+                    val host = match.groupValues[2]
+                    val portStr = match.groupValues[4]
+
+                    val port = if (portStr.isNotEmpty()) {
+                        portStr.toInt()
+                    } else {
+                        when (scheme) {
+                            "rtsp" -> 554
+                            "rtmp" -> 1935
+                            else -> 80
+                        }
+                    }
+
+                    Socket().use { socket ->
+                        socket.connect(InetSocketAddress(host, port), 2000)
+                        return "active" to (System.currentTimeMillis() - startTime)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // 忽略异常，标记为 inactive
+        }
+        return "inactive" to 9999L
+    }
+
     private suspend fun runConcurrentProbe(
         list: List<Triple<String, String, String>>,
         maxConcurrency: Int
@@ -129,23 +210,8 @@ object IptvsProbeService {
                     val channelId = item.second
                     val url = item.third
 
-                    val startTime = System.currentTimeMillis()
-                    var status = "inactive"
-                    var latency = 9999L
-
-                    try {
-                        val headRequest = Request.Builder().url(url).head().build()
-                        client.newCall(headRequest).execute().use { response ->
-                            if (response.isSuccessful || response.code in 300..399) {
-                                status = "active"
-                                latency = System.currentTimeMillis() - startTime
-                            }
-                        }
-                    } catch (e: Exception) {
-                        status = "inactive"
-                    }
-
-                    ProbeResult(sourceId, channelId, status, if (status == "active") latency else 9999L)
+                    val (status, latency) = probeUrl(url)
+                    ProbeResult(sourceId, channelId, status, latency)
                 }
             }
             results.add(task)

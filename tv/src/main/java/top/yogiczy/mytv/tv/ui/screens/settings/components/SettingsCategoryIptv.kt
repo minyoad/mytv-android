@@ -35,6 +35,7 @@ import top.yogiczy.mytv.tv.ui.screens.iptvsource.IptvSourceScreen
 import top.yogiczy.mytv.tv.ui.screens.main.MainViewModel
 import top.yogiczy.mytv.tv.ui.screens.settings.SettingsViewModel
 import top.yogiczy.mytv.tv.ui.utils.Configs
+import top.yogiczy.mytv.tv.ui.utils.IJKProbe
 
 @Composable
 fun SettingsCategoryIptv(
@@ -44,6 +45,7 @@ fun SettingsCategoryIptv(
     channelGroupListProvider: () -> ChannelGroupList = { ChannelGroupList() },
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     SettingsContentList(modifier) {
         item {
@@ -225,6 +227,19 @@ fun SettingsCategoryIptv(
             )
         }
 
+        item {
+            SettingsListItem(
+                headlineContent = "自动线路探测",
+                supportingContent = "直播源更新后自动在后台进行线路探测（仅针对支持的直播源）",
+                trailingContent = {
+                    Switch(settingsViewModel.iptvAutoProbe, null)
+                },
+                onSelected = {
+                    settingsViewModel.iptvAutoProbe = !settingsViewModel.iptvAutoProbe
+                },
+            )
+        }
+
         if (settingsViewModel.iptvSourceCurrent.url.contains("iptvs.mybacc.com")) {
             item {
                 val popupManager = LocalPopupManager.current
@@ -298,6 +313,7 @@ fun SettingsCategoryIptv(
                             serverBaseUrl = baseUrl,
                             isp = settingsViewModel.iptvIptvsIsp,
                             province = settingsViewModel.iptvIptvsProvince,
+                            deepProbe = { url -> IJKProbe.probe(context, url) }
                         ) {
                             probeCount = it
                             if (it >= 0) {

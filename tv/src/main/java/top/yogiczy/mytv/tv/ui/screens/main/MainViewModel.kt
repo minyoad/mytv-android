@@ -1,7 +1,8 @@
 package top.yogiczy.mytv.tv.ui.screens.main
 
+import android.app.Application
 import android.content.Context
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import coil.imageLoader
 import coil.request.CachePolicy
@@ -36,9 +37,12 @@ import top.yogiczy.mytv.core.data.utils.Logger
 import top.yogiczy.mytv.tv.ui.material.Snackbar
 import top.yogiczy.mytv.tv.ui.material.SnackbarType
 import top.yogiczy.mytv.tv.ui.utils.Configs
+import top.yogiczy.mytv.tv.ui.utils.IJKProbe
 import java.time.LocalDate
 
-class MainViewModel : ViewModel() {
+class MainViewModel(
+    application: Application,
+) : AndroidViewModel(application) {
     private val log = Logger.create(javaClass.simpleName)
     private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Loading())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -139,14 +143,20 @@ class MainViewModel : ViewModel() {
     }
 
     private fun probeIptvs() {
+        if (!Configs.iptvAutoProbe) return
+
         val currentSource = Configs.iptvSourceCurrent
         if (currentSource.url.contains("iptvs.mybacc.com")) {
-            val baseUrl = currentSource.url.split("/api/").first()
-            IptvsProbeService.startProbe(
-                serverBaseUrl = baseUrl,
-                isp = Configs.iptvIptvsIsp,
-                province = Configs.iptvIptvsProvince,
-            )
+            viewModelScope.launch {
+                delay(10000) // 延迟10秒，等播放稳定后再开始探测
+                val baseUrl = currentSource.url.split("/api/").first()
+                IptvsProbeService.startProbe(
+                    serverBaseUrl = baseUrl,
+                    isp = Configs.iptvIptvsIsp,
+                    province = Configs.iptvIptvsProvince,
+                    deepProbe = { url -> IJKProbe.probe(getApplication(), url) }
+                )
+            }
         }
     }
 
