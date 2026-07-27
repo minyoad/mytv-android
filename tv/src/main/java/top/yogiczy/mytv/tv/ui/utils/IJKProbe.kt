@@ -23,20 +23,18 @@ object IJKProbe {
         val startTime = System.currentTimeMillis()
 
         val mediaPlayer = IjkMediaPlayer().apply {
-            // 禁用音视频渲染以节省资源
+            // 禁用视频渲染以节省资源，但保留音频解析以确保能进入 Prepared 状态
             setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "vn", 1) // disable video
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "an", 1) // disable audio
             
             // 快速探测设置
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 100L)
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzedduration", 1)
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024 * 10)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", timeout * 1000) // ijk timeout is in microsec? No, it depends on version, usually millis or micro. 
-            // Standard ffmpeg timeout is in microseconds for some options. 
-            // But let's follow the project's Configs.videoPlayerLoadTimeout which is used as millis.
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", timeout * 1000)
             
             setOnPreparedListener {
                 val latency = System.currentTimeMillis() - startTime
+                log.d("Probe success: $url, latency=$latency")
                 deferred.complete(latency)
             }
             
@@ -44,6 +42,11 @@ object IJKProbe {
                 log.e("Probe failed: $url, what=$what, extra=$extra")
                 deferred.complete(null)
                 true
+            }
+
+            setOnInfoListener { _, what, extra ->
+                log.d("Probe info: $url, what=$what, extra=$extra")
+                false
             }
         }
 

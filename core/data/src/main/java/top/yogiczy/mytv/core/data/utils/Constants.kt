@@ -54,7 +54,7 @@ object Constants {
             ),
             IptvSource(
                 name = "测试直播源-iptvs",
-                url = "https://iptvs.mybacc.com/api/export/m3u?status=active",
+                url = "https://iptvs.mybacc.com/api/export/m3u",
             ),
         )
     )

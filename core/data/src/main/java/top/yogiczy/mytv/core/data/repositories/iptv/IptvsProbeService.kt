@@ -14,6 +14,7 @@ import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -23,14 +24,15 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.delay
 
 @OptIn(InternalSerializationApi::class)
 @Serializable
-data class SimpleChannel(val id: String, val name: String, val sources: List<SimpleSource>)
+data class SimpleSourceItem(val id: String, val channelId: String, val url: String)
 
 @OptIn(InternalSerializationApi::class)
 @Serializable
-data class SimpleSource(val id: String, val url: String)
+data class SimpleSourceListResponse(val sources: List<SimpleSourceItem>)
 
 @OptIn(InternalSerializationApi::class)
 @Serializable
@@ -54,9 +56,14 @@ typealias DeepProbeHandler = suspend (url: String) -> Long?
  */
 object IptvsProbeService {
     private val log = Logger.create("IptvsProbeService")
-    private val client = OkHttp.client.newBuilder()
-        .connectTimeout(2500, TimeUnit.MILLISECONDS)
-        .readTimeout(2500, TimeUnit.MILLISECONDS)
+    private val probeClient = OkHttp.client.newBuilder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    private val apiClient = OkHttp.client.newBuilder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
     private val json = Json {
@@ -78,59 +85,88 @@ object IptvsProbeService {
     ) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                log.i("正在拉取最新的 IPTV 电视频道播放线路: $serverBaseUrl")
-                val channels = fetchChannels(serverBaseUrl, onlyActive)
-                if (channels.isEmpty()) {
-                    log.w("拉取到的可测试频道和线路为空")
-                    withContext(Dispatchers.Main) { onComplete(0) }
-                    return@launch
-                }
+                var page = 1
+                val limit = 100
+                var totalSuccessCount = 0
+                var hasMore = true
 
-                val allSourcesToTest = mutableListOf<Triple<String, String, String>>()
-                for (channel in channels) {
-                    for (source in channel.sources) {
-                        allSourcesToTest.add(Triple(source.id, channel.id, source.url))
-                    }
-                }
-
-                log.i("待测物理流: ${allSourcesToTest.size}，开始并发测速（第一阶段：快速嗅探）...")
-                val fastResults = runConcurrentProbe(allSourcesToTest, maxConcurrency = 4)
-
-                var finalResults = fastResults
-
-                // 第二阶段：深度验证
-                if (deepProbe != null) {
-                    val activeResults = fastResults.filter { it.status == "active" }
-                    log.i("进入第二阶段：深度验证（对 ${activeResults.size} 条线路进行播放测试）...")
+                while (hasMore) {
+                    val currentPage = page
+                    log.i("正在拉取最新的 IPTV 电视频道播放线路: $serverBaseUrl (第 $currentPage 页)")
                     
-                    val deepResults = mutableListOf<ProbeResult>()
-                    // 深度测试为了稳定性，采用低并发
-                    val semaphore = Semaphore(1) 
-                    val deferreds = activeResults.map { res ->
-                        async {
-                            semaphore.withPermit {
-                                val url = allSourcesToTest.find { it.first == res.sourceId }?.third ?: ""
-                                val deepLatency = deepProbe(url)
-                                if (deepLatency != null) {
-                                    res.copy(latency = deepLatency)
-                                } else {
-                                    res.copy(status = "inactive", latency = 9999L)
+                    val result = runCatching {
+                        val sources = fetchSourcesPage(serverBaseUrl, isp, province, onlyActive, currentPage, limit)
+                        
+                        if (sources.isEmpty()) {
+                            if (currentPage == 1) log.w("拉取到的可测试频道和线路为空")
+                            hasMore = false
+                            return@runCatching
+                        }
+
+                        val allSourcesToTest = sources.map { Triple(it.id, it.channelId, it.url) }
+
+                        log.i("第 $currentPage 页待测物理流: ${allSourcesToTest.size}，开始并发测速（第一阶段：快速嗅探）...")
+                        val fastResults = runConcurrentProbe(allSourcesToTest, maxConcurrency = 4)
+
+                        var finalResults = fastResults
+
+                        // 第二阶段：深度验证
+                        if (deepProbe != null) {
+                            val activeResults = fastResults.filter { it.status == "active" }
+                            log.i("第 $currentPage 页进入第二阶段：深度验证（对 ${activeResults.size} 条线路进行播放测试）...")
+                            
+                            val deepResults = mutableListOf<ProbeResult>()
+                            // 深度测试为了稳定性，采用低并发
+                            val semaphore = Semaphore(1) 
+                            val deferreds = activeResults.map { res ->
+                                async {
+                                    semaphore.withPermit {
+                                        val url = allSourcesToTest.find { it.first == res.sourceId }?.third ?: ""
+                                        val deepLatency = deepProbe(url)
+                                        if (deepLatency != null) {
+                                            res.copy(latency = deepLatency)
+                                        } else {
+                                            res.copy(status = "inactive", latency = 9999L)
+                                        }
+                                    }
                                 }
                             }
+                            deepResults.addAll(deferreds.awaitAll())
+                            
+                            // 合并结果：保留没进深度测试的（已标记为 inactive 的）和深度测试后的结果
+                            finalResults = fastResults.filter { it.status != "active" } + deepResults
+                        }
+
+                        log.i("第 $currentPage 页测速完毕，上报结果: 健康可用 ${finalResults.count { it.status == "active" }} 条")
+                        
+                        // 稍微延迟一下，避开测速时的网络竞争
+                        delay(500)
+                        val count = submitReport(serverBaseUrl, isp, province, finalResults)
+                        log.i("第 $currentPage 页数据上报完成，生效 $count 条报告")
+                        totalSuccessCount += count
+
+                        if (sources.size < limit) {
+                            hasMore = false
+                        } else {
+                            page++
                         }
                     }
-                    deepResults.addAll(deferreds.awaitAll())
-                    
-                    // 合并结果：保留没进深度测试的（已标记为 inactive 的）和深度测试后的结果
-                    finalResults = fastResults.filter { it.status != "active" } + deepResults
+
+                    result.onFailure { e ->
+                        log.e("第 $currentPage 页处理失败", e)
+                        // 如果是第一页就完全失败，则不再继续
+                        if (currentPage == 1) {
+                            hasMore = false
+                        } else {
+                            // 其他页面失败，尝试继续下一页
+                            page++
+                        }
+                    }
                 }
 
-                log.i("测速完毕，上报结果: 健康可用 ${finalResults.count { it.status == "active" }} 条")
-                val count = submitReport(serverBaseUrl, isp, province, finalResults)
-                log.i("数据上报完成，生效 $count 条报告")
-
+                log.i("所有测速任务完成，共计生效 $totalSuccessCount 条报告")
                 withContext(Dispatchers.Main) {
-                    onComplete(count)
+                    onComplete(totalSuccessCount)
                 }
             } catch (e: Exception) {
                 log.e("测速任务失败", e)
@@ -141,14 +177,36 @@ object IptvsProbeService {
         }
     }
 
-    private fun fetchChannels(baseUrl: String, onlyActive: Boolean): List<SimpleChannel> {
-        val url = if (onlyActive) "$baseUrl/api/channels?status=testable" else "$baseUrl/api/channels"
-        val request = Request.Builder().url(url).get().build()
+    private fun fetchSourcesPage(
+        baseUrl: String,
+        isp: String,
+        province: String,
+        onlyActive: Boolean,
+        page: Int,
+        limit: Int
+    ): List<SimpleSourceItem> {
+        val httpUrl = baseUrl.toHttpUrlOrNull()
+            ?.newBuilder()
+            ?.addPathSegments("api/sources/client-test-list")
+            ?.addQueryParameter("isp", isp)
+            ?.addQueryParameter("province", province)
+            ?.addQueryParameter("onlyActive", onlyActive.toString())
+            ?.addQueryParameter("page", page.toString())
+            ?.addQueryParameter("limit", limit.toString())
+            ?.build() ?: throw IOException("无效的 BaseUrl: $baseUrl")
 
-        client.newCall(request).execute().use { response ->
+        val request = Request.Builder().url(httpUrl).get().build()
+
+        apiClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("下载失败: ${response.code}")
             val bodyString = response.body?.string() ?: return emptyList()
-            return json.decodeFromString<List<SimpleChannel>>(bodyString)
+
+            return try {
+                json.decodeFromString<SimpleSourceListResponse>(bodyString).sources
+            } catch (e: Exception) {
+                log.e("解析 IPTV 线路列表失败, body: $bodyString", e)
+                throw e
+            }
         }
     }
 
@@ -160,34 +218,40 @@ object IptvsProbeService {
         try {
             if (url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true)) {
                 val headRequest = Request.Builder().url(url).head().build()
-                client.newCall(headRequest).execute().use { response ->
-                    if (response.isSuccessful || response.code in 300..399) {
-                        return "active" to (System.currentTimeMillis() - startTime)
+                try {
+                    probeClient.newCall(headRequest).execute().use { response ->
+                        if (response.isSuccessful || response.code in 300..399) {
+                            return "active" to (System.currentTimeMillis() - startTime)
+                        }
+                        // 某些服务器返回 405 或 403 可能仍可用，尝试 TCP 探测
+                    }
+                } catch (e: Exception) {
+                    // HEAD 请求超时或异常，尝试 TCP 探测保底
+                }
+            }
+
+            // 非 HTTP 协议或 HTTP HEAD 失败后，尝试 TCP 端口探测
+            val regex = Regex("^(\\w+://)?([^:/\\s?#]+)(:(\\d+))?")
+            val match = regex.find(url)
+            if (match != null) {
+                val scheme = match.groupValues[1].lowercase().removeSuffix("://")
+                val host = match.groupValues[2]
+                val portStr = match.groupValues[4]
+
+                val port = if (portStr.isNotEmpty()) {
+                    portStr.toInt()
+                } else {
+                    when (scheme) {
+                        "rtsp" -> 554
+                        "rtmp" -> 1935
+                        "https" -> 443
+                        else -> 80
                     }
                 }
-            } else {
-                // 非 HTTP 协议 (RTSP, RTMP, P3P等)，尝试 TCP 端口探测
-                val regex = Regex("^(\\w+://)?([^:/\\s]+)(:(\\d+))?")
-                val match = regex.find(url)
-                if (match != null) {
-                    val scheme = match.groupValues[1].lowercase().removeSuffix("://")
-                    val host = match.groupValues[2]
-                    val portStr = match.groupValues[4]
 
-                    val port = if (portStr.isNotEmpty()) {
-                        portStr.toInt()
-                    } else {
-                        when (scheme) {
-                            "rtsp" -> 554
-                            "rtmp" -> 1935
-                            else -> 80
-                        }
-                    }
-
-                    Socket().use { socket ->
-                        socket.connect(InetSocketAddress(host, port), 2000)
-                        return "active" to (System.currentTimeMillis() - startTime)
-                    }
+                Socket().use { socket ->
+                    socket.connect(InetSocketAddress(host, port), 10000)
+                    return "active" to (System.currentTimeMillis() - startTime)
                 }
             }
         } catch (e: Exception) {
@@ -233,7 +297,7 @@ object IptvsProbeService {
             .post(requestBody)
             .build()
 
-        client.newCall(request).execute().use { response ->
+        apiClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 log.e("上报结果被拒绝: ${response.code}")
                 return 0
