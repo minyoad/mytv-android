@@ -15,9 +15,11 @@ object ChannelUtil {
             listOf(
                 listOf("cctv", "5+"),
                 listOf("cctv", "5plus"),
-                listOf("cctv", "体育"),
+                listOf("cctv", "赛事"),
                 listOf("中央", "5+"),
                 listOf("中央", "五+"),
+                listOf("中央", "赛事"),
+                listOf("体育", "赛事"),
             )
         ),
         "CCTV-10科教" to standardCctvChannelNameTest(
@@ -379,7 +381,7 @@ object ChannelUtil {
     }
 
 
-    private fun standardChannelName(name: String): String {
+    fun standardChannelName(name: String): String {
         return standardChannelNameTest.entries.firstOrNull { it.value.invoke(name) }?.key
             ?: name
     }

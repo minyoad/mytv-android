@@ -6,6 +6,7 @@ import top.yogiczy.mytv.core.data.entities.channel.Channel
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroup
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelList
+import top.yogiczy.mytv.core.data.utils.ChannelUtil
 import top.yogiczy.mytv.core.data.utils.Constants
 import java.net.URLEncoder
 
@@ -32,10 +33,12 @@ class TxtIptvParser : IptvParser {
                 val res = line.split(",", "，")
                 if (res.size < 2) return@forEach
 
+                val channelName = ChannelUtil.standardChannelName(res[0].trim())
+
                 iptvList.addAll(res[1].split("#").map { url ->
                     IptvResponseItem(
                         name = res[0].trim(),
-                        channelName = res[0].trim(),
+                        channelName = channelName,
                         groupName = groupName ?: "其他",
                         url = url.trim(),
                     )

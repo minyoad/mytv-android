@@ -16,6 +16,7 @@ import top.yogiczy.mytv.core.data.network.OkHttp
 import top.yogiczy.mytv.core.data.network.await
 import top.yogiczy.mytv.core.data.repositories.FileCacheRepository
 import top.yogiczy.mytv.core.data.repositories.epg.fetcher.EpgFetcher.Companion.fetchStream
+import top.yogiczy.mytv.core.data.utils.ChannelUtil
 import top.yogiczy.mytv.core.data.utils.Constants
 import top.yogiczy.mytv.core.data.utils.Logger
 import top.yogiczy.mytv.core.util.utils.removeBom
@@ -76,7 +77,7 @@ class EpgRepository(
                         val depth = parser.depth
                         while (!(parser.next() == XmlPullParser.END_TAG && parser.depth == depth)) {
                             if (parser.eventType == XmlPullParser.START_TAG && parser.name == "display-name") {
-                                name = getSafeText()
+                                name = ChannelUtil.standardChannelName(getSafeText())
                             }
                         }
 
