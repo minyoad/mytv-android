@@ -11,6 +11,7 @@ import top.yogiczy.mytv.core.data.network.await
 import top.yogiczy.mytv.core.data.repositories.FileCacheRepository
 import top.yogiczy.mytv.core.data.repositories.iptv.parser.IptvParser
 import top.yogiczy.mytv.core.data.utils.Logger
+import top.yogiczy.mytv.core.data.utils.SP
 import top.yogiczy.mytv.core.util.utils.removeBom
 
 
@@ -39,20 +40,35 @@ class IptvRepository(
 
     private val idGenerator = IdGenerator()
 
+    private val etagKey = "iptv_etag_${source.url.hashCode().toUInt().toString(16)}"
+    private var etag: String
+        get() = SP.getString(etagKey, "")
+        set(value) = SP.putString(etagKey, value)
+
     /**
      * 获取直播源数据
      */
-    private suspend fun fetchSource(sourceUrl: String): String {
+    private suspend fun fetchSource(sourceUrl: String): String? {
         log.d("获取远程直播源: $source")
 
         val client = OkHttp.client
-        val request = Request.Builder().url(sourceUrl).build()
+        val request = Request.Builder().url(sourceUrl).apply {
+            if (etag.isNotEmpty() && getCacheFile().exists()) {
+                header("If-None-Match", etag)
+            }
+        }.build()
 
         try {
             val response = client.newCall(request).await()
 
+            if (response.code == 304) {
+                log.i("直播源内容未变动 (304 Not Modified): $source")
+                return null
+            }
+
             if (!response.isSuccessful) throw Exception("${response.code}: ${response.message}")
 
+            etag = response.header("ETag") ?: ""
             return withContext(Dispatchers.IO) {
                 response.body?.string() ?: ""
             }

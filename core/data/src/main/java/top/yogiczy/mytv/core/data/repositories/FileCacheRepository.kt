@@ -31,7 +31,7 @@ abstract class FileCacheRepository(
         file.writeText(data)
     }
 
-    protected suspend fun getOrRefresh(cacheTime: Long, refreshOp: suspend () -> String): String {
+    protected suspend fun getOrRefresh(cacheTime: Long, refreshOp: suspend () -> String?): String {
         return getOrRefresh(
             { lastModified, _ -> System.currentTimeMillis() - lastModified >= cacheTime },
             refreshOp,
@@ -40,7 +40,7 @@ abstract class FileCacheRepository(
 
     protected suspend fun getOrRefresh(
         isExpired: (lastModified: Long, cacheData: String?) -> Boolean,
-        refreshOp: suspend () -> String,
+        refreshOp: suspend () -> String?,
     ): String {
         var data = getCacheData()
 
@@ -49,13 +49,20 @@ abstract class FileCacheRepository(
         }
 
         if (data.isNullOrBlank()) {
-            data = refreshOp()
+            val newData = refreshOp()
 
-            if(data!=getCacheData()) {
-                onDataChanged?.invoke()
+            if (newData == null) {
+                // 304 Not Modified
+                getCacheFile().setLastModified(System.currentTimeMillis())
+                data = getCacheData() ?: ""
+            } else {
+                if (newData != getCacheData()) {
+                    onDataChanged?.invoke()
+                }
+
+                setCacheData(newData)
+                data = newData
             }
-
-            setCacheData(data)
         }
 
         return data
