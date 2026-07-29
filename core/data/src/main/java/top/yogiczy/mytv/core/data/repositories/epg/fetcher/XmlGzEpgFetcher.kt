@@ -1,7 +1,7 @@
 package top.yogiczy.mytv.core.data.repositories.epg.fetcher
 
 import okhttp3.Response
-import top.yogiczy.mytv.core.data.repositories.epg.fetcher.EpgFetcher.Companion.fetchText
+import top.yogiczy.mytv.core.data.repositories.epg.fetcher.EpgFetcher.Companion.fetchStream
 
 /**
  * 节目单xml.gz数据获取
@@ -11,5 +11,5 @@ class XmlGzEpgFetcher : EpgFetcher {
         return url.endsWith(".gz")
     }
 
-    override suspend fun fetch(response: Response) = response.fetchText()
+    override suspend fun fetchStream(response: Response) = response.fetchStream()
 }

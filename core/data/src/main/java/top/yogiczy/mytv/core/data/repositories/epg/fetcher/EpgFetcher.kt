@@ -4,7 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Response
 import top.yogiczy.mytv.core.data.utils.Logger
-import java.io.ByteArrayInputStream
+import java.io.InputStream
 import java.util.zip.GZIPInputStream
 
 /**
@@ -17,9 +17,9 @@ interface EpgFetcher {
     fun isSupport(url: String): Boolean
 
     /**
-     * 获取节目单
+     * 获取节目单流
      */
-    suspend fun fetch(response: Response): String
+    suspend fun fetchStream(response: Response): InputStream
 
     companion object {
         private val log = Logger.create("EpgFetcher")
@@ -30,21 +30,23 @@ interface EpgFetcher {
             DefaultEpgFetcher(),
         )
 
-        suspend fun Response.fetchText(): String = withContext(Dispatchers.IO) {
-            val body = body ?: return@withContext ""
-            val bytes = body.bytes()
+        suspend fun Response.fetchStream(): InputStream = withContext(Dispatchers.IO) {
+            val body = body ?: throw Exception("响应体为空")
+            val inputStream = body.byteStream()
 
-            log.i("获取节目单数据: size=${bytes.size}, contentType=${body.contentType()}")
+            // 预读取两个字节来检测是否是 GZIP 格式
+            val bufferedInputStream = inputStream.buffered()
+            bufferedInputStream.mark(2)
+            val header = ByteArray(2)
+            val read = bufferedInputStream.read(header)
+            bufferedInputStream.reset()
 
-            if (bytes.size >= 2 && bytes[0] == 0x1f.toByte() && bytes[1] == 0x8b.toByte()) {
-                log.d("检测到GZIP格式，开始解压")
-                GZIPInputStream(ByteArrayInputStream(bytes)).use { gzipInputStream ->
-                    gzipInputStream.bufferedReader().readText()
-                }
+            if (read == 2 && header[0] == 0x1f.toByte() && header[1] == 0x8b.toByte()) {
+                log.d("检测到GZIP格式，开始解压流")
+                GZIPInputStream(bufferedInputStream)
             } else {
-                val charset = body.contentType()?.charset() ?: Charsets.UTF_8
-                log.d("检测到明文格式，编码=${charset.name()}")
-                String(bytes, charset)
+                log.d("检测到明文格式流")
+                bufferedInputStream
             }
         }
     }
