@@ -2,6 +2,7 @@ package top.yogiczy.mytv.core.data.repositories.epg
 
 import android.util.Xml
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Request
@@ -15,6 +16,7 @@ import top.yogiczy.mytv.core.data.network.OkHttp
 import top.yogiczy.mytv.core.data.network.await
 import top.yogiczy.mytv.core.data.repositories.FileCacheRepository
 import top.yogiczy.mytv.core.data.repositories.epg.fetcher.EpgFetcher.Companion.fetchStream
+import top.yogiczy.mytv.core.data.utils.Constants
 import top.yogiczy.mytv.core.data.utils.Logger
 import top.yogiczy.mytv.core.util.utils.removeBom
 import java.io.File
@@ -22,6 +24,7 @@ import java.io.FileInputStream
 import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * 节目单获取
@@ -176,22 +179,39 @@ private class EpgXmlRepository(
     private val url: String
 ) : FileCacheRepository("epg-${url.hashCode().toUInt().toString(16)}.xml") {
     private val log = Logger.create(javaClass.simpleName)
+    private val epgClient = OkHttp.client.newBuilder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
 
     /**
      * 获取并缓存远程xml
      */
     private suspend fun downloadAndCacheXml(file: File) = withContext(Dispatchers.IO) {
-        log.i("下载节目单xml: $url")
-        val client = OkHttp.client
-        val request = Request.Builder().url(url).build()
+        var retryCount = 0
+        while (retryCount <= Constants.HTTP_RETRY_COUNT) {
+            try {
+                log.i("下载节目单xml (第 ${retryCount + 1}/${Constants.HTTP_RETRY_COUNT + 1} 次): $url")
+                val request = Request.Builder().url(url).build()
 
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw Exception("${response.code}: ${response.message}")
+                epgClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw Exception("${response.code}: ${response.message}")
 
-            response.fetchStream().use { inputStream ->
-                file.outputStream().use { outputStream ->
-                    inputStream.copyTo(outputStream)
+                    response.fetchStream().use { inputStream ->
+                        file.outputStream().use { outputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+                    }
                 }
+                return@withContext // 成功下载并缓存，跳出循环
+            } catch (ex: Exception) {
+                retryCount++
+                if (retryCount > Constants.HTTP_RETRY_COUNT) {
+                    log.e("下载节目单xml最终失败: $url", ex)
+                    throw ex
+                }
+                log.w("下载节目单xml失败 (${ex.message}), 准备第 ${retryCount + 1} 次重试...")
+                delay(Constants.HTTP_RETRY_INTERVAL)
             }
         }
     }
