@@ -58,9 +58,12 @@ class VideoPlayerState(
     /** 元数据 */
     var metadata by mutableStateOf(VideoPlayer.Metadata())
 
+    private var isAutoDisplayModeSet = false
+
     fun prepare(url: String) {
         currentUrl = url
         error = null
+        isAutoDisplayModeSet = false
         instance.prepare(url)
     }
 
@@ -109,7 +112,14 @@ class VideoPlayerState(
     fun initialize() {
         instance.initialize()
         instance.onResolution { width, height ->
-            if (width > 0 && height > 0) aspectRatio = width.toFloat() / height
+            if (width > 0 && height > 0) {
+                aspectRatio = width.toFloat() / height
+
+                if (settingsViewModel.videoPlayerAutoFillForSD && width == 720 && height == 576) {
+                    displayMode = VideoPlayerDisplayMode.FILL
+                    isAutoDisplayModeSet = true
+                }
+            }
         }
         
         // 监听播放器类型变化
@@ -154,7 +164,9 @@ class VideoPlayerState(
         instance.onReady {
             onReadyListeners.forEach { it.invoke() }
             error = null
-            displayMode = defaultDisplayModeProvider()
+            if (!isAutoDisplayModeSet) {
+                displayMode = defaultDisplayModeProvider()
+            }
         }
         instance.onBuffering {
             isBuffering = it

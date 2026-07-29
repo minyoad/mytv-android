@@ -170,6 +170,9 @@ object Configs {
 
         /** 播放器 跳过同一VSync渲染多帧 */
         VIDEO_PLAYER_SKIP_MULTIPLE_FRAMES_ON_SAME_VSYNC,
+
+        /** 播放器 自动填充标清 (720x576) */
+        VIDEO_PLAYER_AUTO_FILL_FOR_SD,
     }
 
     /** ==================== 应用 ==================== */
@@ -452,6 +455,11 @@ object Configs {
     var videoPlayerSkipMultipleFramesOnSameVSync: Boolean
         get() = SP.getBoolean(KEY.VIDEO_PLAYER_SKIP_MULTIPLE_FRAMES_ON_SAME_VSYNC.name, false)
         set(value) = SP.putBoolean(KEY.VIDEO_PLAYER_SKIP_MULTIPLE_FRAMES_ON_SAME_VSYNC.name, value)
+
+    /** 播放器 自动填充标清 (720x576) */
+    var videoPlayerAutoFillForSD: Boolean
+        get() = SP.getBoolean(KEY.VIDEO_PLAYER_AUTO_FILL_FOR_SD.name, true)
+        set(value) = SP.putBoolean(KEY.VIDEO_PLAYER_AUTO_FILL_FOR_SD.name, value)
 
     /** 播放器类型 */
     enum class VideoPlayerType(val label: String) {

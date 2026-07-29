@@ -446,6 +446,14 @@ class SettingsViewModel : ViewModel() {
             Configs.videoPlayerSkipMultipleFramesOnSameVSync = value
         }
 
+    private var _videoPlayerAutoFillForSD by mutableStateOf(Configs.videoPlayerAutoFillForSD)
+    var videoPlayerAutoFillForSD: Boolean
+        get() = _videoPlayerAutoFillForSD
+        set(value) {
+            _videoPlayerAutoFillForSD = value
+            Configs.videoPlayerAutoFillForSD = value
+        }
+
     init {
         // 删除过期的预约
         _epgChannelReserveList = EpgProgrammeReserveList(
@@ -503,6 +511,7 @@ class SettingsViewModel : ViewModel() {
         _videoPlayerForceAudioSoftDecode = Configs.videoPlayerForceSoftDecode
         _videoPlayerRenderMode = Configs.videoPlayerRenderMode
         _videoPlayerSkipMultipleFramesOnSameVSync = Configs.videoPlayerSkipMultipleFramesOnSameVSync
+        _videoPlayerAutoFillForSD = Configs.videoPlayerAutoFillForSD
     }
 
     @OptIn(coil.annotation.ExperimentalCoilApi::class)

@@ -83,6 +83,20 @@ fun SettingsCategoryVideoPlayer(
         }
 
         item {
+            SettingsListItem(
+                headlineContent = "自动填充标清",
+                supportingContent = "针对 720x576 分辨率直播源自动调整为填充模式",
+                trailingContent = {
+                    Switch(settingsViewModel.videoPlayerAutoFillForSD, null)
+                },
+                onSelected = {
+                    settingsViewModel.videoPlayerAutoFillForSD =
+                        !settingsViewModel.videoPlayerAutoFillForSD
+                },
+            )
+        }
+
+        item {
             val popupManager = LocalPopupManager.current
             var visible by remember { mutableStateOf(false) }
 
