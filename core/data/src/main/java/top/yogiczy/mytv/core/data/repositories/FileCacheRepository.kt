@@ -17,10 +17,10 @@ abstract class FileCacheRepository(
     public fun setDataChanged(onDataChanged: () ->Unit) {
         this.onDataChanged = onDataChanged
     }
-    private fun getCacheFile() =
+    protected fun getCacheFile() =
         if (isFullPath) File(fileName) else File(Globals.cacheDir, fileName)
 
-    private suspend fun getCacheData(): String? = withContext(Dispatchers.IO) {
+    protected suspend fun getCacheData(): String? = withContext(Dispatchers.IO) {
         val file = getCacheFile()
         if (file.exists()) file.readText()
         else null

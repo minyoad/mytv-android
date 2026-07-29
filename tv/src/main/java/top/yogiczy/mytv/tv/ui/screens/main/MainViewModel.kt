@@ -64,11 +64,33 @@ class MainViewModel(
     fun init() {
         viewModelScope.launch {
             _uiState.value = MainUiState.Loading()
-            if(Configs.iptvHybridMode!= Configs.IptvHybridMode.DISABLE) {
-                ChannelUtil.loadHybridWebViewUrlFromRemote(Constants.WEBVIEW_CHANNELS_URL)
+
+            // 1. 尝试并行加载混合模式配置
+            val hybridJob = launch {
+                if (Configs.iptvHybridMode != Configs.IptvHybridMode.DISABLE) {
+                    ChannelUtil.loadHybridWebViewUrlFromRemote(Constants.WEBVIEW_CHANNELS_URL)
+                }
             }
-            refreshChannel()
-            refreshEpg()
+
+            // 2. 尝试从缓存快速恢复频道列表
+            val cachedChannelGroupList = IptvRepository(Configs.iptvSourceCurrent).getCachedChannelGroupList()
+            if (cachedChannelGroupList != null) {
+                log.i("从缓存中快速恢复频道列表")
+                _uiState.value = MainUiState.Ready(channelGroupList = hybridChannel(cachedChannelGroupList))
+                
+                // 缓存恢复后并行拉取最新数据
+                launch { 
+                    hybridJob.join() // 确保混合模式配置加载完再更新频道
+                    refreshChannel(showLoading = false)
+                    refreshEpg()
+                }
+            } else {
+                // 无缓存时，顺序执行以保证首次加载体验
+                hybridJob.join()
+                refreshChannel(showLoading = true)
+                refreshEpg()
+            }
+            
             probeIptvs()
         }
     }
@@ -160,9 +182,9 @@ class MainViewModel(
         }
     }
 
-    private suspend fun refreshChannel() {
+    private suspend fun refreshChannel(showLoading: Boolean = true) {
         flow {
-            val iptvRepository= IptvRepository(Configs.iptvSourceCurrent)
+            val iptvRepository = IptvRepository(Configs.iptvSourceCurrent)
             iptvRepository.setDataChanged({ onChannelChanged() })
             emit(
                 iptvRepository.getChannelGroupList(cacheTime = Configs.iptvSourceCacheTime)
@@ -171,17 +193,30 @@ class MainViewModel(
             .retryWhen { _, attempt ->
                 if (attempt >= Constants.HTTP_RETRY_COUNT) return@retryWhen false
 
-                _uiState.value =
-                    MainUiState.Loading("获取远程直播源(${attempt + 1}/${Constants.HTTP_RETRY_COUNT})...")
+                if (showLoading) {
+                    _uiState.value =
+                        MainUiState.Loading("获取远程直播源(${attempt + 1}/${Constants.HTTP_RETRY_COUNT})...")
+                }
                 delay(Constants.HTTP_RETRY_INTERVAL)
                 true
             }
             .catch {
-                _uiState.value = MainUiState.Error(it.message)
+                if (showLoading || _uiState.value !is MainUiState.Ready) {
+                    _uiState.value = MainUiState.Error(it.message)
+                } else {
+                    log.e("后台刷新直播源失败", it)
+                }
             }
             .map { hybridChannel(it) }
             .map {
-                _uiState.value = MainUiState.Ready(channelGroupList = it)
+                // 只有当数据真的变化时才更新 UI，避免冗余刷新
+                val currentState = _uiState.value
+                if (currentState !is MainUiState.Ready || currentState.channelGroupList != it) {
+                    _uiState.value = MainUiState.Ready(
+                        channelGroupList = it,
+                        epgList = (currentState as? MainUiState.Ready)?.epgList ?: EpgList()
+                    )
+                }
                 it
             }
             .collect()

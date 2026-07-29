@@ -70,37 +70,52 @@ class IptvRepository(
             val rawData = getOrRefresh(if (source.isLocal) Long.MAX_VALUE else cacheTime) {
                 fetchSource(source.url)
             }
-            val sourceData = rawData.removeBom()
-
-            val parser = IptvParser.instances.first { it.isSupport(source.url, sourceData) }
-            val startTime = System.currentTimeMillis()
-            val groupList = parser.parse(sourceData)
-
-            // 在获取到频道列表后，统一生成频道id
-            idGenerator.reset()
-            val groupListWithIds = ChannelGroupList(
-                value = groupList.map { group ->
-                    group.copy(channelList = ChannelList(group.channelList.map { channel ->
-                        channel.copy(id = idGenerator.nextId().toString())
-                    }))
-                },
-                epgUrl = groupList.epgUrl,
-            )
-
-            log.i(
-                listOf(
-                    "解析直播源（${source.name}）完成：${groupList.size}个分组",
-                    "${groupList.sumOf { it.channelList.size }}个频道",
-                    "${groupList.sumOf { it.channelList.sumOf { channel -> channel.urlList.size } }}条线路",
-                    "耗时：${System.currentTimeMillis() - startTime}ms",
-                ).joinToString()
-            )
-
-            return groupListWithIds
+            return parseData(rawData)
         } catch (ex: Exception) {
             log.e("获取直播源失败", ex)
             throw Exception(ex)
         }
+    }
+
+    /**
+     * 获取缓存的直播源分组列表
+     */
+    suspend fun getCachedChannelGroupList(): ChannelGroupList? {
+        return try {
+            getCacheData()?.let { parseData(it) }
+        } catch (ex: Exception) {
+            null
+        }
+    }
+
+    private suspend fun parseData(rawData: String): ChannelGroupList {
+        val sourceData = rawData.removeBom()
+
+        val parser = IptvParser.instances.first { it.isSupport(source.url, sourceData) }
+        val startTime = System.currentTimeMillis()
+        val groupList = parser.parse(sourceData)
+
+        // 在获取到频道列表后，统一生成频道id
+        idGenerator.reset()
+        val groupListWithIds = ChannelGroupList(
+            value = groupList.map { group ->
+                group.copy(channelList = ChannelList(group.channelList.map { channel ->
+                    channel.copy(id = idGenerator.nextId().toString())
+                }))
+            },
+            epgUrl = groupList.epgUrl,
+        )
+
+        log.i(
+            listOf(
+                "解析直播源（${source.name}）完成：${groupList.size}个分组",
+                "${groupList.sumOf { it.channelList.size }}个频道",
+                "${groupList.sumOf { it.channelList.sumOf { channel -> channel.urlList.size } }}条线路",
+                "耗时：${System.currentTimeMillis() - startTime}ms",
+            ).joinToString()
+        )
+
+        return groupListWithIds
     }
 
     override suspend fun clearCache() {
