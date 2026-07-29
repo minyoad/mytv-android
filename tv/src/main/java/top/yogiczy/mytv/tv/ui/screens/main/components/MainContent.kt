@@ -7,12 +7,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.launch
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelIdx
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelList
@@ -46,6 +46,7 @@ import top.yogiczy.mytv.tv.ui.screens.settings.SettingsViewModel
 import top.yogiczy.mytv.tv.ui.screens.update.UpdateScreen
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.VideoPlayerScreen
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.rememberVideoPlayerState
+import top.yogiczy.mytv.tv.ui.screens.main.MainViewModel
 import top.yogiczy.mytv.tv.ui.screens.videoplayercontroller.VideoPlayerControllerScreen
 import top.yogiczy.mytv.tv.ui.screens.videoplayerdiaplaymode.VideoPlayerDisplayModeScreen
 import top.yogiczy.mytv.tv.ui.screens.webview.WebViewScreen
@@ -62,8 +63,9 @@ fun MainContent(
     filteredChannelGroupListProvider: () -> ChannelGroupList = { ChannelGroupList() },
     epgListProvider: () -> EpgList = { EpgList() },
     settingsViewModel: SettingsViewModel = viewModel(),
+    mainViewModel: MainViewModel = viewModel(),
 ) {
-    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     val videoPlayerState =
         rememberVideoPlayerState(defaultDisplayModeProvider = { settingsViewModel.videoPlayerDisplayMode })
@@ -382,11 +384,8 @@ fun MainContent(
                 mainContentState.isSettingsScreenVisible = true
             },
             onClearCache = {
-                settingsViewModel.iptvPlayableHostList = emptySet()
-                coroutineScope.launch {
-                    IptvRepository(settingsViewModel.iptvSourceCurrent).clearCache()
-                    EpgRepository(settingsViewModel.epgSourceCurrent).clearCache()
-                    Snackbar.show("缓存已清除，请重启应用")
+                settingsViewModel.clearCache(context) {
+                    mainViewModel.init()
                 }
             },
             onClose = { mainContentState.isQuickOpScreenVisible = false },

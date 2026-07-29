@@ -1,5 +1,6 @@
 package top.yogiczy.mytv.tv.ui.screens.settings
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -7,11 +8,21 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import coil.imageLoader
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import top.yogiczy.mytv.core.data.entities.epg.EpgList
 import top.yogiczy.mytv.core.data.entities.epg.EpgProgrammeReserveList
 import top.yogiczy.mytv.core.data.entities.epgsource.EpgSource
 import top.yogiczy.mytv.core.data.entities.epgsource.EpgSourceList
 import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSource
 import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSourceList
+import top.yogiczy.mytv.core.data.repositories.epg.EpgRepository
+import top.yogiczy.mytv.core.data.repositories.iptv.IptvRepository
+import top.yogiczy.mytv.core.data.utils.Globals
+import top.yogiczy.mytv.tv.ui.material.Snackbar
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.VideoPlayerDisplayMode
 import top.yogiczy.mytv.tv.ui.utils.Configs
 
@@ -492,5 +503,30 @@ class SettingsViewModel : ViewModel() {
         _videoPlayerForceAudioSoftDecode = Configs.videoPlayerForceSoftDecode
         _videoPlayerRenderMode = Configs.videoPlayerRenderMode
         _videoPlayerSkipMultipleFramesOnSameVSync = Configs.videoPlayerSkipMultipleFramesOnSameVSync
+    }
+
+    @OptIn(coil.annotation.ExperimentalCoilApi::class)
+    fun clearCache(context: Context, onComplete: () -> Unit = {}) {
+        iptvPlayableHostList = emptySet()
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                // 清理所有直播源和节目单文件缓存
+                Globals.cacheDir.listFiles()?.forEach { file ->
+                    if (file.name.startsWith("iptv-") || file.name.startsWith("epg-")) {
+                        file.delete()
+                    }
+                }
+                
+                // 清理图片磁盘缓存
+                context.imageLoader.diskCache?.clear()
+            }
+
+            // 清理内存缓存
+            EpgList.clearCache()
+            context.imageLoader.memoryCache?.clear()
+
+            Snackbar.show("已清除所有缓存")
+            onComplete()
+        }
     }
 }

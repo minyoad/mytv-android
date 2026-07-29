@@ -6,12 +6,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Switch
 import kotlinx.coroutines.launch
 import top.yogiczy.mytv.core.data.utils.SP
 import top.yogiczy.mytv.tv.ui.material.LocalPopupManager
 import top.yogiczy.mytv.tv.ui.material.Snackbar
+import top.yogiczy.mytv.tv.ui.screens.main.MainViewModel
 import top.yogiczy.mytv.tv.ui.screens.settings.SettingsViewModel
 import top.yogiczy.mytv.tv.ui.screens.update.UpdateViewModel
 
@@ -20,6 +22,7 @@ fun SettingsCategoryApp(
     modifier: Modifier = Modifier,
     settingsViewModel: SettingsViewModel = viewModel(),
     updateViewModel: UpdateViewModel = viewModel(),
+    mainViewModel: MainViewModel = viewModel(),
 ) {
     SettingsContentList(modifier) {
         item {
@@ -48,6 +51,20 @@ fun SettingsCategoryApp(
                 onSelected = {
                     popupManager.push(focusRequester, true)
                     updateViewModel.visible = true
+                },
+            )
+        }
+
+        item {
+            val context = LocalContext.current
+
+            SettingsListItem(
+                headlineContent = "清除缓存",
+                supportingContent = "包括图片、节目单、直播源等缓存",
+                onSelected = {
+                    settingsViewModel.clearCache(context) {
+                        mainViewModel.init()
+                    }
                 },
             )
         }
