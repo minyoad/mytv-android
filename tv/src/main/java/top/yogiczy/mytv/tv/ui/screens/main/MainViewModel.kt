@@ -174,8 +174,6 @@ class MainViewModel(
                 val baseUrl = currentSource.url.split("/api/").first()
                 IptvsProbeService.startProbe(
                     serverBaseUrl = baseUrl,
-                    isp = Configs.iptvIptvsIsp,
-                    province = Configs.iptvIptvsProvince,
                     deepProbe = { url -> IJKProbe.probe(getApplication(), url) }
                 )
             }

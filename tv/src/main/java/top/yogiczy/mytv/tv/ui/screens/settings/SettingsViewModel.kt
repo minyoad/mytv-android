@@ -205,22 +205,6 @@ class SettingsViewModel : ViewModel() {
             Configs.iptvHybridMode = value
         }
 
-    private var _iptvIptvsIsp by mutableStateOf(Configs.iptvIptvsIsp)
-    var iptvIptvsIsp: String
-        get() = _iptvIptvsIsp
-        set(value) {
-            _iptvIptvsIsp = value
-            Configs.iptvIptvsIsp = value
-        }
-
-    private var _iptvIptvsProvince by mutableStateOf(Configs.iptvIptvsProvince)
-    var iptvIptvsProvince: String
-        get() = _iptvIptvsProvince
-        set(value) {
-            _iptvIptvsProvince = value
-            Configs.iptvIptvsProvince = value
-        }
-
     private var _iptvAutoProbe by mutableStateOf(Configs.iptvAutoProbe)
     var iptvAutoProbe: Boolean
         get() = _iptvAutoProbe
@@ -484,8 +468,6 @@ class SettingsViewModel : ViewModel() {
         _iptvChannelGroupHiddenList = Configs.iptvChannelGroupHiddenList
 //        _iptvChannelUrlIdx = Configs.iptvChannelUrlIdx
         _iptvHybridMode = Configs.iptvHybridMode
-        _iptvIptvsIsp = Configs.iptvIptvsIsp
-        _iptvIptvsProvince = Configs.iptvIptvsProvince
         _iptvAutoProbe = Configs.iptvAutoProbe
         _epgEnable = Configs.epgEnable
         _epgSourceCurrent = Configs.epgSourceCurrent

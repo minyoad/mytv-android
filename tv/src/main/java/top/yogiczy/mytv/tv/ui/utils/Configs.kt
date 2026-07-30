@@ -80,12 +80,6 @@ object Configs {
 
         IPTV_CHANNEL_URL_INDEX,
 
-        /** 线路测速 ISP */
-        IPTV_IPTVS_ISP,
-
-        /** 线路测速 省份 */
-        IPTV_IPTVS_PROVINCE,
-
         /** 是否开启自动线路探测 */
         IPTV_AUTO_PROBE,
 
@@ -295,16 +289,6 @@ object Configs {
             SP.getInt(KEY.IPTV_HYBRID_MODE.name, IptvHybridMode.DISABLE.value)
         )
         set(value) = SP.putInt(KEY.IPTV_HYBRID_MODE.name, value.value)
-
-    /** 线路测速 ISP */
-    var iptvIptvsIsp: String
-        get() = SP.getString(KEY.IPTV_IPTVS_ISP.name, "中国电信")
-        set(value) = SP.putString(KEY.IPTV_IPTVS_ISP.name, value)
-
-    /** 线路测速 省份 */
-    var iptvIptvsProvince: String
-        get() = SP.getString(KEY.IPTV_IPTVS_PROVINCE.name, "北京")
-        set(value) = SP.putString(KEY.IPTV_IPTVS_PROVINCE.name, value)
 
     /** 是否开启自动线路探测 */
     var iptvAutoProbe: Boolean

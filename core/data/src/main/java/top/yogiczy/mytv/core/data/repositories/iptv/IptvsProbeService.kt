@@ -85,40 +85,33 @@ object IptvsProbeService {
      */
     fun startProbe(
         serverBaseUrl: String,
-        isp: String,
-        province: String,
         onlyActive: Boolean = true,
         deepProbe: DeepProbeHandler? = null,
         onComplete: (successCount: Int) -> Unit = {}
     ) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                var currentIsp = isp
-                var currentProvince = province
+                var currentIsp = ""
+                var currentProvince = ""
 
                 // 自动检测当前设备网络环境
-                if (currentIsp == "AUTO" || currentProvince == "AUTO") {
-                    log.i("正在自动检测本机 IP 与网络环境归属...")
-                    runCatching {
-                        val detectUrl = serverBaseUrl.toHttpUrlOrNull()
-                            ?.newBuilder()
-                            ?.addPathSegments("api/sources/detect-ip")
-                            ?.build() ?: throw IOException("无效的 BaseUrl: $serverBaseUrl")
-                        
-                        val request = Request.Builder().url(detectUrl).header("User-Agent", USER_AGENT).get().build()
-                        apiClient.newCall(request).execute().use { response ->
-                            if (response.isSuccessful) {
-                                val body = response.body?.string() ?: ""
-                                val detectData = json.decodeFromString<IpDetectResponse>(body)
-                                currentIsp = detectData.isp
-                                currentProvince = detectData.province
-                                log.i("网络环境自动识别成功: $currentProvince - $currentIsp (IP: ${detectData.ip})")
-                            }
-                        }
-                    }.onFailure { log.e("自动检测网络环境失败", it) }
-                    
-                    if (currentIsp == "AUTO") currentIsp = "未知"
-                    if (currentProvince == "AUTO") currentProvince = "未知"
+                log.i("正在自动检测本机 IP 与网络环境归属...")
+                val detectUrl = serverBaseUrl.toHttpUrlOrNull()
+                    ?.newBuilder()
+                    ?.addPathSegments("api/sources/detect-ip")
+                    ?.build() ?: throw IOException("无效的 BaseUrl: $serverBaseUrl")
+
+                val request = Request.Builder().url(detectUrl).header("User-Agent", USER_AGENT).get().build()
+                apiClient.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val body = response.body?.string() ?: ""
+                        val detectData = json.decodeFromString<IpDetectResponse>(body)
+                        currentIsp = detectData.isp
+                        currentProvince = detectData.province
+                        log.i("网络环境自动识别成功: $currentProvince - $currentIsp (IP: ${detectData.ip})")
+                    } else {
+                        throw IOException("无法获取网络环境 (HTTP ${response.code})")
+                    }
                 }
 
                 var page = 1
