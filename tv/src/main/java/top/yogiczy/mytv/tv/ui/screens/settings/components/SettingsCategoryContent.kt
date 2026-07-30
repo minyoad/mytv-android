@@ -28,7 +28,6 @@ fun SettingsCategoryContent(
         Text(text = currentCategory.title, style = MaterialTheme.typography.headlineSmall)
 
         when (currentCategory) {
-            SettingsCategories.ABOUT -> SettingsCategoryAbout()
             SettingsCategories.APP -> SettingsCategoryApp()
             SettingsCategories.IPTV -> SettingsCategoryIptv(
                 channelGroupListProvider = channelGroupListProvider,
@@ -36,14 +35,13 @@ fun SettingsCategoryContent(
 
             SettingsCategories.EPG -> SettingsCategoryEpg()
             SettingsCategories.EPG_RESERVE -> SettingsCategoryEpgReserve()
-            SettingsCategories.UI -> SettingsCategoryUI()
             SettingsCategories.FAVORITE -> SettingsCategoryFavorite()
-            SettingsCategories.UPDATE -> SettingsCategoryUpdate()
+            SettingsCategories.UI -> SettingsCategoryUI()
             SettingsCategories.VIDEO_PLAYER -> SettingsCategoryVideoPlayer()
-            SettingsCategories.HTTP -> SettingsCategoryHttp()
             SettingsCategories.DEBUG -> SettingsCategoryDebug()
             SettingsCategories.LOG -> SettingsCategoryLog()
             SettingsCategories.MORE -> SettingsCategoryPush()
+            SettingsCategories.ABOUT -> SettingsCategoryAbout()
         }
     }
 }

@@ -24,6 +24,9 @@ fun SettingsCategoryApp(
     updateViewModel: UpdateViewModel = viewModel(),
     mainViewModel: MainViewModel = viewModel(),
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     SettingsContentList(modifier) {
         item {
             SettingsListItem(
@@ -56,8 +59,36 @@ fun SettingsCategoryApp(
         }
 
         item {
-            val context = LocalContext.current
+            val list = mapOf(
+                "stable" to "稳定版",
+                "beta" to "测试版",
+            )
 
+            SettingsListItem(
+                headlineContent = "更新通道",
+                trailingContent = list[settingsViewModel.updateChannel] ?: "",
+                onSelected = {
+                    settingsViewModel.updateChannel =
+                        list.keys.first { it != settingsViewModel.updateChannel }
+                },
+            )
+        }
+
+        item {
+            SettingsListItem(
+                headlineContent = "更新强提醒",
+                supportingContent = if (settingsViewModel.updateForceRemind) "检测到新版本时会全屏提醒"
+                else "检测到新版本时仅消息提示",
+                trailingContent = {
+                    Switch(settingsViewModel.updateForceRemind, null)
+                },
+                onSelected = {
+                    settingsViewModel.updateForceRemind = !settingsViewModel.updateForceRemind
+                },
+            )
+        }
+
+        item {
             SettingsListItem(
                 headlineContent = "清除缓存",
                 supportingContent = "包括图片、节目单、直播源等缓存",
@@ -70,8 +101,6 @@ fun SettingsCategoryApp(
         }
 
         item {
-            val coroutineScope = rememberCoroutineScope()
-
             SettingsListItem(
                 headlineContent = "恢复初始化",
                 onSelected = {
