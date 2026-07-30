@@ -179,6 +179,13 @@ class SettingsViewModel : ViewModel() {
         set(value) {
             Configs.iptvAutoProbe = value
         }
+
+    private var _iptvAutoProbeDailyLimit by mutableIntStateOf(Configs.iptvAutoProbeDailyLimit)
+    var iptvAutoProbeDailyLimit: Int
+        get() = _iptvAutoProbeDailyLimit
+        set(value) {
+            Configs.iptvAutoProbeDailyLimit = value
+        }
         
     private var _videoPlayerType by mutableStateOf(Configs.videoPlayerType)
     var videoPlayerType: Configs.VideoPlayerType
@@ -408,6 +415,7 @@ class SettingsViewModel : ViewModel() {
                     Configs.KEY.IPTV_CHANNEL_GROUP_HIDDEN_LIST -> _iptvChannelGroupHiddenList = Configs.iptvChannelGroupHiddenList
                     Configs.KEY.IPTV_HYBRID_MODE -> _iptvHybridMode = Configs.iptvHybridMode
                     Configs.KEY.IPTV_AUTO_PROBE -> _iptvAutoProbe = Configs.iptvAutoProbe
+                    Configs.KEY.IPTV_AUTO_PROBE_DAILY_LIMIT -> _iptvAutoProbeDailyLimit = Configs.iptvAutoProbeDailyLimit
                     Configs.KEY.EPG_ENABLE -> _epgEnable = Configs.epgEnable
                     Configs.KEY.EPG_SOURCE_CURRENT -> _epgSourceCurrent = Configs.epgSourceCurrent
                     Configs.KEY.EPG_SOURCE_LIST -> _epgSourceList = Configs.epgSourceList

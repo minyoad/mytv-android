@@ -181,10 +181,23 @@ class MainViewModel(
     private fun probeIptvs() {
         if (!Configs.iptvAutoProbe) return
 
+        val today = LocalDate.now().toString()
+        if (Configs.iptvAutoProbeLastDate != today) {
+            Configs.iptvAutoProbeLastDate = today
+            Configs.iptvAutoProbeDailyCount = 0
+        }
+
+        if (Configs.iptvAutoProbeDailyCount >= Configs.iptvAutoProbeDailyLimit) {
+            log.i("今日自动线路探测次数已达限额 (${Configs.iptvAutoProbeDailyLimit})，跳过")
+            return
+        }
+
         val currentSource = Configs.iptvSourceCurrent
         if (currentSource.url.contains("iptvs.mybacc.com")) {
             viewModelScope.launch {
                 delay(10000) // 延迟10秒，等播放稳定后再开始探测
+                
+                Configs.iptvAutoProbeDailyCount++
                 val baseUrl = currentSource.url.split("/api/").first()
                 IptvsProbeService.startProbe(
                     serverBaseUrl = baseUrl,

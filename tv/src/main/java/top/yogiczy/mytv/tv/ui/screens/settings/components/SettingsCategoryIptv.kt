@@ -239,6 +239,37 @@ fun SettingsCategoryIptv(
             )
         }
 
+        if (settingsViewModel.iptvAutoProbe) {
+            item {
+                val popupManager = LocalPopupManager.current
+                var visible by remember { mutableStateOf(false) }
+
+                SettingsListItem(
+                    headlineContent = "每日自动探测次数",
+                    supportingContent = "限制每日后台自动执行探测任务的次数",
+                    trailingContent = if (settingsViewModel.iptvAutoProbeDailyLimit == Int.MAX_VALUE) "无限制"
+                    else "${settingsViewModel.iptvAutoProbeDailyLimit} 次",
+                    onSelected = {
+                        popupManager.push(it, true)
+                        visible = true
+                    },
+                )
+
+                SelectDialog(
+                    visibleProvider = { visible },
+                    onDismissRequest = { visible = false },
+                    title = "每日自动探测次数",
+                    currentDataProvider = { settingsViewModel.iptvAutoProbeDailyLimit },
+                    dataListProvider = { listOf(1, 2, 3, 5, Int.MAX_VALUE) },
+                    dataText = { if (it == Int.MAX_VALUE) "无限制" else "$it 次" },
+                    onDataSelected = {
+                        settingsViewModel.iptvAutoProbeDailyLimit = it
+                        visible = false
+                    },
+                )
+            }
+        }
+
         if (settingsViewModel.iptvSourceCurrent.url.contains("iptvs.mybacc.com")) {
             item {
                 var probeCount by remember { mutableIntStateOf(0) }

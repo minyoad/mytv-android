@@ -92,6 +92,15 @@ object Configs {
         /** 是否开启自动线路探测 */
         IPTV_AUTO_PROBE,
 
+        /** 每日自动线路探测次数限制 */
+        IPTV_AUTO_PROBE_DAILY_LIMIT,
+
+        /** 最后一次自动线路探测日期 */
+        IPTV_AUTO_PROBE_LAST_DATE,
+
+        /** 今日自动线路探测次数 */
+        IPTV_AUTO_PROBE_DAILY_COUNT,
+
         /** ==================== 节目单 ==================== */
         /** 启用节目单 */
         EPG_ENABLE,
@@ -363,6 +372,30 @@ object Configs {
         set(value) {
             SP.putBoolean(KEY.IPTV_AUTO_PROBE.name, value)
             notifyChange(KEY.IPTV_AUTO_PROBE)
+        }
+
+    /** 每日自动线路探测次数限制 */
+    var iptvAutoProbeDailyLimit: Int
+        get() = SP.getInt(KEY.IPTV_AUTO_PROBE_DAILY_LIMIT.name, 1)
+        set(value) {
+            SP.putInt(KEY.IPTV_AUTO_PROBE_DAILY_LIMIT.name, value)
+            notifyChange(KEY.IPTV_AUTO_PROBE_DAILY_LIMIT)
+        }
+
+    /** 最后一次自动线路探测日期 */
+    var iptvAutoProbeLastDate: String
+        get() = SP.getString(KEY.IPTV_AUTO_PROBE_LAST_DATE.name, "")
+        set(value) {
+            SP.putString(KEY.IPTV_AUTO_PROBE_LAST_DATE.name, value)
+            notifyChange(KEY.IPTV_AUTO_PROBE_LAST_DATE)
+        }
+
+    /** 今日自动线路探测次数 */
+    var iptvAutoProbeDailyCount: Int
+        get() = SP.getInt(KEY.IPTV_AUTO_PROBE_DAILY_COUNT.name, 0)
+        set(value) {
+            SP.putInt(KEY.IPTV_AUTO_PROBE_DAILY_COUNT.name, value)
+            notifyChange(KEY.IPTV_AUTO_PROBE_DAILY_COUNT)
         }
 
     /** ==================== 节目单 ==================== */
