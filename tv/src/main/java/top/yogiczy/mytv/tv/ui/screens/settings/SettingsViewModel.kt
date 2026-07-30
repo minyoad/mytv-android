@@ -32,7 +32,6 @@ class SettingsViewModel : ViewModel() {
     var appBootLaunch: Boolean
         get() = _appBootLaunch
         set(value) {
-            _appBootLaunch = value
             Configs.appBootLaunch = value
         }
 
@@ -40,7 +39,6 @@ class SettingsViewModel : ViewModel() {
     var appLastLatestVersion: String
         get() = _appLastLatestVersion
         set(value) {
-            _appLastLatestVersion = value
             Configs.appLastLatestVersion = value
         }
 
@@ -48,7 +46,6 @@ class SettingsViewModel : ViewModel() {
     var appAgreementAgreed: Boolean
         get() = _appAgreementAgreed
         set(value) {
-            _appAgreementAgreed = value
             Configs.appAgreementAgreed = value
         }
 
@@ -56,7 +53,6 @@ class SettingsViewModel : ViewModel() {
     var debugShowFps: Boolean
         get() = _debugShowFps
         set(value) {
-            _debugShowFps = value
             Configs.debugShowFps = value
         }
 
@@ -64,7 +60,6 @@ class SettingsViewModel : ViewModel() {
     var debugShowVideoPlayerMetadata: Boolean
         get() = _debugShowVideoPlayerMetadata
         set(value) {
-            _debugShowVideoPlayerMetadata = value
             Configs.debugShowVideoPlayerMetadata = value
         }
 
@@ -72,7 +67,6 @@ class SettingsViewModel : ViewModel() {
     var debugShowLayoutGrids: Boolean
         get() = _debugShowLayoutGrids
         set(value) {
-            _debugShowLayoutGrids = value
             Configs.debugShowLayoutGrids = value
         }
 
@@ -80,40 +74,25 @@ class SettingsViewModel : ViewModel() {
     var iptvLastChannelIdx: Int
         get() = _iptvLastChannelIdx
         set(value) {
-            _iptvLastChannelIdx = value
             Configs.iptvLastChannelIdx = value
         }
 
     private var _iptvChannelUrlIdxMap= mutableStateOf(mutableMapOf<String, Int>().apply {
-        putAll(Configs.iptvChannelUrlIdx) // 将 Configs.urlIdxs 中的数据放入 myMap
+        putAll(Configs.iptvChannelUrlIdx)
     })
     fun getIptvChannelUrlIdx(channel_name:String):Int{
         return _iptvChannelUrlIdxMap.value.getOrDefault(channel_name,0)
     }
     fun setIptvChannelUrlIdx(channel_name:String,value:Int){
-        _iptvChannelUrlIdxMap.value[channel_name] = value
-        Configs.iptvChannelUrlIdx = _iptvChannelUrlIdxMap.value
+        val newMap = _iptvChannelUrlIdxMap.value.toMutableMap()
+        newMap[channel_name] = value
+        Configs.iptvChannelUrlIdx = newMap
     }
-//    var iptvChannelUrlIdx: Int
-//        get(channel_name) = _iptvChannelUrlIdxMap.getOrDefault(channel_name,0)
-//        set(channel_name,value) {
-//            _iptvChannelUrlIdx = value
-//            Configs.iptvChannelUrlIdx = value
-//        }
-
-//    private var _iptvChannelUrlIdx by mutableStateOf(Configs.iptvChannelUrlIdx)
-//    var iptvChannelUrlIdx: Map<String, Int>
-//        get() = _iptvChannelUrlIdx
-//        set(value) {
-//            _iptvChannelUrlIdx = value
-//            Configs.iptvChannelUrlIdx = value
-//        }
 
     private var _iptvChannelChangeFlip by mutableStateOf(Configs.iptvChannelChangeFlip)
     var iptvChannelChangeFlip: Boolean
         get() = _iptvChannelChangeFlip
         set(value) {
-            _iptvChannelChangeFlip = value
             Configs.iptvChannelChangeFlip = value
         }
 
@@ -121,7 +100,6 @@ class SettingsViewModel : ViewModel() {
     var iptvSourceCacheTime: Long
         get() = _iptvSourceCacheTime
         set(value) {
-            _iptvSourceCacheTime = value
             Configs.iptvSourceCacheTime = value
         }
 
@@ -129,7 +107,6 @@ class SettingsViewModel : ViewModel() {
     var iptvSourceCurrent: IptvSource
         get() = _iptvSourceCurrent
         set(value) {
-            _iptvSourceCurrent = value
             Configs.iptvSourceCurrent = value
         }
 
@@ -137,7 +114,6 @@ class SettingsViewModel : ViewModel() {
     var iptvSourceList: IptvSourceList
         get() = _iptvSourceList
         set(value) {
-            _iptvSourceList = value
             Configs.iptvSourceList = value
         }
 
@@ -145,7 +121,6 @@ class SettingsViewModel : ViewModel() {
     var iptvPlayableHostList: Set<String>
         get() = _iptvPlayableHostList
         set(value) {
-            _iptvPlayableHostList = value
             Configs.iptvPlayableHostList = value
         }
 
@@ -153,7 +128,6 @@ class SettingsViewModel : ViewModel() {
     var iptvChannelNoSelectEnable: Boolean
         get() = _iptvChannelNoSelectEnable
         set(value) {
-            _iptvChannelNoSelectEnable = value
             Configs.iptvChannelNoSelectEnable = value
         }
 
@@ -161,7 +135,6 @@ class SettingsViewModel : ViewModel() {
     var iptvChannelFavoriteEnable: Boolean
         get() = _iptvChannelFavoriteEnable
         set(value) {
-            _iptvChannelFavoriteEnable = value
             Configs.iptvChannelFavoriteEnable = value
         }
 
@@ -169,7 +142,6 @@ class SettingsViewModel : ViewModel() {
     var iptvChannelFavoriteListVisible: Boolean
         get() = _iptvChannelFavoriteListVisible
         set(value) {
-            _iptvChannelFavoriteListVisible = value
             Configs.iptvChannelFavoriteListVisible = value
         }
 
@@ -177,7 +149,6 @@ class SettingsViewModel : ViewModel() {
     var iptvChannelFavoriteList: Set<String>
         get() = _iptvChannelFavoriteList
         set(value) {
-            _iptvChannelFavoriteList = value
             Configs.iptvChannelFavoriteList = value
         }
 
@@ -185,7 +156,6 @@ class SettingsViewModel : ViewModel() {
     var iptvChannelFavoriteChangeBoundaryJumpOut: Boolean
         get() = _iptvChannelFavoriteChangeBoundaryJumpOut
         set(value) {
-            _iptvChannelFavoriteChangeBoundaryJumpOut = value
             Configs.iptvChannelFavoriteChangeBoundaryJumpOut = value
         }
 
@@ -193,7 +163,6 @@ class SettingsViewModel : ViewModel() {
     var iptvChannelGroupHiddenList: Set<String>
         get() = _iptvChannelGroupHiddenList
         set(value) {
-            _iptvChannelGroupHiddenList = value
             Configs.iptvChannelGroupHiddenList = value
         }
 
@@ -201,7 +170,6 @@ class SettingsViewModel : ViewModel() {
     var iptvHybridMode: Configs.IptvHybridMode
         get() = _iptvHybridMode
         set(value) {
-            _iptvHybridMode = value
             Configs.iptvHybridMode = value
         }
 
@@ -209,7 +177,6 @@ class SettingsViewModel : ViewModel() {
     var iptvAutoProbe: Boolean
         get() = _iptvAutoProbe
         set(value) {
-            _iptvAutoProbe = value
             Configs.iptvAutoProbe = value
         }
         
@@ -217,9 +184,7 @@ class SettingsViewModel : ViewModel() {
     var videoPlayerType: Configs.VideoPlayerType
         get() = _videoPlayerType
         set(value) {
-            _videoPlayerType = value
             Configs.videoPlayerType = value
-            onVideoPlayerTypeChanged?.invoke(value)
         }
 
     var videoPlayerTypeValue: Configs.VideoPlayerType = Configs.VideoPlayerType.MEDIA3
@@ -234,7 +199,6 @@ class SettingsViewModel : ViewModel() {
     var epgEnable: Boolean
         get() = _epgEnable
         set(value) {
-            _epgEnable = value
             Configs.epgEnable = value
         }
 
@@ -242,7 +206,6 @@ class SettingsViewModel : ViewModel() {
     var epgSourceCurrent: EpgSource
         get() = _epgSourceCurrent
         set(value) {
-            _epgSourceCurrent = value
             Configs.epgSourceCurrent = value
         }
 
@@ -250,7 +213,6 @@ class SettingsViewModel : ViewModel() {
     var epgSourceList: EpgSourceList
         get() = _epgSourceList
         set(value) {
-            _epgSourceList = value
             Configs.epgSourceList = value
         }
 
@@ -258,7 +220,6 @@ class SettingsViewModel : ViewModel() {
     var epgRefreshTimeThreshold: Int
         get() = _epgRefreshTimeThreshold
         set(value) {
-            _epgRefreshTimeThreshold = value
             Configs.epgRefreshTimeThreshold = value
         }
 
@@ -266,7 +227,6 @@ class SettingsViewModel : ViewModel() {
     var epgChannelReserveList: EpgProgrammeReserveList
         get() = _epgChannelReserveList
         set(value) {
-            _epgChannelReserveList = value
             Configs.epgChannelReserveList = value
         }
 
@@ -274,7 +234,6 @@ class SettingsViewModel : ViewModel() {
     var epgRefreshIdleEnable: Boolean
         get() = _epgRefreshIdleEnable
         set(value) {
-            _epgRefreshIdleEnable = value
             Configs.epgRefreshIdleEnable = value
         }
 
@@ -282,7 +241,6 @@ class SettingsViewModel : ViewModel() {
     var epgRefreshIdleDelay: Long
         get() = _epgRefreshIdleDelay
         set(value) {
-            _epgRefreshIdleDelay = value
             Configs.epgRefreshIdleDelay = value
         }
 
@@ -290,7 +248,6 @@ class SettingsViewModel : ViewModel() {
     var uiShowEpgProgrammeProgress: Boolean
         get() = _uiShowEpgProgrammeProgress
         set(value) {
-            _uiShowEpgProgrammeProgress = value
             Configs.uiShowEpgProgrammeProgress = value
         }
 
@@ -298,7 +255,6 @@ class SettingsViewModel : ViewModel() {
     var uiShowEpgProgrammePermanentProgress: Boolean
         get() = _uiShowEpgProgrammePermanentProgress
         set(value) {
-            _uiShowEpgProgrammePermanentProgress = value
             Configs.uiShowEpgProgrammePermanentProgress = value
         }
 
@@ -306,7 +262,6 @@ class SettingsViewModel : ViewModel() {
     var uiShowChannelLogo: Boolean
         get() = _uiShowChannelLogo
         set(value) {
-            _uiShowChannelLogo = value
             Configs.uiShowChannelLogo = value
         }
 
@@ -314,7 +269,6 @@ class SettingsViewModel : ViewModel() {
     var uiUseClassicPanelScreen: Boolean
         get() = _uiUseClassicPanelScreen
         set(value) {
-            _uiUseClassicPanelScreen = value
             Configs.uiUseClassicPanelScreen = value
         }
 
@@ -322,7 +276,6 @@ class SettingsViewModel : ViewModel() {
     var uiDensityScaleRatio: Float
         get() = _uiDensityScaleRatio
         set(value) {
-            _uiDensityScaleRatio = value
             Configs.uiDensityScaleRatio = value
         }
 
@@ -330,7 +283,6 @@ class SettingsViewModel : ViewModel() {
     var uiFontScaleRatio: Float
         get() = _uiFontScaleRatio
         set(value) {
-            _uiFontScaleRatio = value
             Configs.uiFontScaleRatio = value
         }
 
@@ -338,7 +290,6 @@ class SettingsViewModel : ViewModel() {
     var uiTimeShowMode: Configs.UiTimeShowMode
         get() = _uiTimeShowMode
         set(value) {
-            _uiTimeShowMode = value
             Configs.uiTimeShowMode = value
         }
 
@@ -346,7 +297,6 @@ class SettingsViewModel : ViewModel() {
     var uiFocusOptimize: Boolean
         get() = _uiFocusOptimize
         set(value) {
-            _uiFocusOptimize = value
             Configs.uiFocusOptimize = value
         }
 
@@ -354,7 +304,6 @@ class SettingsViewModel : ViewModel() {
     var uiScreenAutoCloseDelay: Long
         get() = _uiScreenAutoCloseDelay
         set(value) {
-            _uiScreenAutoCloseDelay = value
             Configs.uiScreenAutoCloseDelay = value
         }
 
@@ -362,7 +311,6 @@ class SettingsViewModel : ViewModel() {
     var updateForceRemind: Boolean
         get() = _updateForceRemind
         set(value) {
-            _updateForceRemind = value
             Configs.updateForceRemind = value
         }
 
@@ -370,7 +318,6 @@ class SettingsViewModel : ViewModel() {
     var updateChannel: String
         get() = _updateChannel
         set(value) {
-            _updateChannel = value
             Configs.updateChannel = value
         }
 
@@ -378,7 +325,6 @@ class SettingsViewModel : ViewModel() {
     var videoPlayerUserAgent: String
         get() = _videoPlayerUserAgent
         set(value) {
-            _videoPlayerUserAgent = value
             Configs.videoPlayerUserAgent = value
         }
 
@@ -386,7 +332,6 @@ class SettingsViewModel : ViewModel() {
     var videoPlayerLoadTimeout: Long
         get() = _videoPlayerLoadTimeout
         set(value) {
-            _videoPlayerLoadTimeout = value
             Configs.videoPlayerLoadTimeout = value
         }
 
@@ -394,39 +339,34 @@ class SettingsViewModel : ViewModel() {
     var videoPlayerDisplayMode: VideoPlayerDisplayMode
         get() = _videoPlayerAspectRatio
         set(value) {
-            _videoPlayerAspectRatio = value
             Configs.videoPlayerDisplayMode = value
         }
 
-    private var _videoPlayerForceAudioSoftDecode by mutableStateOf(false)
+    private var _videoPlayerForceAudioSoftDecode by mutableStateOf(Configs.videoPlayerForceSoftDecode)
     var videoPlayerForceSoftDecode: Boolean
         get() = _videoPlayerForceAudioSoftDecode
         set(value) {
-            _videoPlayerForceAudioSoftDecode = value
             Configs.videoPlayerForceSoftDecode = value
         }
 
-    private var _videoPlayerRenderMode by mutableStateOf(Configs.VideoPlayerRenderMode.SURFACE_VIEW)
+    private var _videoPlayerRenderMode by mutableStateOf(Configs.videoPlayerRenderMode)
     var videoPlayerRenderMode: Configs.VideoPlayerRenderMode
         get() = _videoPlayerRenderMode
         set(value) {
-            _videoPlayerRenderMode = value
             Configs.videoPlayerRenderMode = value
         }
 
-    private var _videoPlayerStopPreviousMediaItem by mutableStateOf(false)
+    private var _videoPlayerStopPreviousMediaItem by mutableStateOf(Configs.videoPlayerStopPreviousMediaItem)
     var videoPlayerStopPreviousMediaItem: Boolean
         get() = _videoPlayerStopPreviousMediaItem
         set(value) {
-            _videoPlayerStopPreviousMediaItem = value
             Configs.videoPlayerStopPreviousMediaItem = value
         }
 
-    private var _videoPlayerSkipMultipleFramesOnSameVSync by mutableStateOf(false)
+    private var _videoPlayerSkipMultipleFramesOnSameVSync by mutableStateOf(Configs.videoPlayerSkipMultipleFramesOnSameVSync)
     var videoPlayerSkipMultipleFramesOnSameVSync: Boolean
         get() = _videoPlayerSkipMultipleFramesOnSameVSync
         set(value) {
-            _videoPlayerSkipMultipleFramesOnSameVSync = value
             Configs.videoPlayerSkipMultipleFramesOnSameVSync = value
         }
 
@@ -434,7 +374,6 @@ class SettingsViewModel : ViewModel() {
     var videoPlayerAutoFillForSD: Boolean
         get() = _videoPlayerAutoFillForSD
         set(value) {
-            _videoPlayerAutoFillForSD = value
             Configs.videoPlayerAutoFillForSD = value
         }
 
@@ -445,55 +384,64 @@ class SettingsViewModel : ViewModel() {
                 System.currentTimeMillis() < it.startAt + 60 * 1000
             }
         )
-    }
 
-    fun refresh() {
-        _appBootLaunch = Configs.appBootLaunch
-        _appLastLatestVersion = Configs.appLastLatestVersion
-        _appAgreementAgreed = Configs.appAgreementAgreed
-        _debugShowFps = Configs.debugShowFps
-        _debugShowVideoPlayerMetadata = Configs.debugShowVideoPlayerMetadata
-        _debugShowLayoutGrids = Configs.debugShowLayoutGrids
-        _iptvLastChannelIdx = Configs.iptvLastChannelIdx
-        _iptvChannelChangeFlip = Configs.iptvChannelChangeFlip
-        _iptvSourceCacheTime = Configs.iptvSourceCacheTime
-        _iptvSourceCurrent = Configs.iptvSourceCurrent
-        _iptvSourceList = Configs.iptvSourceList
-        _iptvPlayableHostList = Configs.iptvPlayableHostList
-        _iptvChannelNoSelectEnable = Configs.iptvChannelNoSelectEnable
-        _iptvChannelFavoriteEnable = Configs.iptvChannelFavoriteEnable
-        _iptvChannelFavoriteListVisible = Configs.iptvChannelFavoriteListVisible
-        _iptvChannelFavoriteList = Configs.iptvChannelFavoriteList
-        _iptvChannelFavoriteChangeBoundaryJumpOut = Configs.iptvChannelFavoriteChangeBoundaryJumpOut
-        _iptvChannelGroupHiddenList = Configs.iptvChannelGroupHiddenList
-//        _iptvChannelUrlIdx = Configs.iptvChannelUrlIdx
-        _iptvHybridMode = Configs.iptvHybridMode
-        _iptvAutoProbe = Configs.iptvAutoProbe
-        _epgEnable = Configs.epgEnable
-        _epgSourceCurrent = Configs.epgSourceCurrent
-        _epgSourceList = Configs.epgSourceList
-        _epgRefreshTimeThreshold = Configs.epgRefreshTimeThreshold
-        _epgChannelReserveList = Configs.epgChannelReserveList
-        _epgRefreshIdleEnable = Configs.epgRefreshIdleEnable
-        _epgRefreshIdleDelay = Configs.epgRefreshIdleDelay
-        _uiShowEpgProgrammeProgress = Configs.uiShowEpgProgrammeProgress
-        _uiShowEpgProgrammePermanentProgress = Configs.uiShowEpgProgrammePermanentProgress
-        _uiShowChannelLogo = Configs.uiShowChannelLogo
-        _uiUseClassicPanelScreen = Configs.uiUseClassicPanelScreen
-        _uiDensityScaleRatio = Configs.uiDensityScaleRatio
-        _uiFontScaleRatio = Configs.uiFontScaleRatio
-        _uiTimeShowMode = Configs.uiTimeShowMode
-        _uiFocusOptimize = Configs.uiFocusOptimize
-        _uiScreenAutoCloseDelay = Configs.uiScreenAutoCloseDelay
-        _updateForceRemind = Configs.updateForceRemind
-        _updateChannel = Configs.updateChannel
-        _videoPlayerUserAgent = Configs.videoPlayerUserAgent
-        _videoPlayerLoadTimeout = Configs.videoPlayerLoadTimeout
-        _videoPlayerAspectRatio = Configs.videoPlayerDisplayMode
-        _videoPlayerForceAudioSoftDecode = Configs.videoPlayerForceSoftDecode
-        _videoPlayerRenderMode = Configs.videoPlayerRenderMode
-        _videoPlayerSkipMultipleFramesOnSameVSync = Configs.videoPlayerSkipMultipleFramesOnSameVSync
-        _videoPlayerAutoFillForSD = Configs.videoPlayerAutoFillForSD
+        viewModelScope.launch {
+            Configs.onKeyChanged.collect { key ->
+                when (key) {
+                    Configs.KEY.APP_BOOT_LAUNCH -> _appBootLaunch = Configs.appBootLaunch
+                    Configs.KEY.APP_LAST_LATEST_VERSION -> _appLastLatestVersion = Configs.appLastLatestVersion
+                    Configs.KEY.APP_AGREEMENT_AGREED -> _appAgreementAgreed = Configs.appAgreementAgreed
+                    Configs.KEY.DEBUG_SHOW_FPS -> _debugShowFps = Configs.debugShowFps
+                    Configs.KEY.DEBUG_SHOW_VIDEO_PLAYER_METADATA -> _debugShowVideoPlayerMetadata = Configs.debugShowVideoPlayerMetadata
+                    Configs.KEY.DEBUG_SHOW_LAYOUT_GRIDS -> _debugShowLayoutGrids = Configs.debugShowLayoutGrids
+                    Configs.KEY.IPTV_LAST_CHANNEL_IDX -> _iptvLastChannelIdx = Configs.iptvLastChannelIdx
+                    Configs.KEY.IPTV_CHANNEL_CHANGE_FLIP -> _iptvChannelChangeFlip = Configs.iptvChannelChangeFlip
+                    Configs.KEY.IPTV_SOURCE_CURRENT -> _iptvSourceCurrent = Configs.iptvSourceCurrent
+                    Configs.KEY.IPTV_SOURCE_LIST -> _iptvSourceList = Configs.iptvSourceList
+                    Configs.KEY.IPTV_SOURCE_CACHE_TIME -> _iptvSourceCacheTime = Configs.iptvSourceCacheTime
+                    Configs.KEY.IPTV_PLAYABLE_HOST_LIST -> _iptvPlayableHostList = Configs.iptvPlayableHostList
+                    Configs.KEY.IPTV_CHANNEL_NO_SELECT_ENABLE -> _iptvChannelNoSelectEnable = Configs.iptvChannelNoSelectEnable
+                    Configs.KEY.IPTV_CHANNEL_FAVORITE_ENABLE -> _iptvChannelFavoriteEnable = Configs.iptvChannelFavoriteEnable
+                    Configs.KEY.IPTV_CHANNEL_FAVORITE_LIST_VISIBLE -> _iptvChannelFavoriteListVisible = Configs.iptvChannelFavoriteListVisible
+                    Configs.KEY.IPTV_CHANNEL_FAVORITE_LIST -> _iptvChannelFavoriteList = Configs.iptvChannelFavoriteList
+                    Configs.KEY.IPTV_CHANNEL_FAVORITE_CHANGE_BOUNDARY_JUMP_OUT -> _iptvChannelFavoriteChangeBoundaryJumpOut = Configs.iptvChannelFavoriteChangeBoundaryJumpOut
+                    Configs.KEY.IPTV_CHANNEL_GROUP_HIDDEN_LIST -> _iptvChannelGroupHiddenList = Configs.iptvChannelGroupHiddenList
+                    Configs.KEY.IPTV_HYBRID_MODE -> _iptvHybridMode = Configs.iptvHybridMode
+                    Configs.KEY.IPTV_AUTO_PROBE -> _iptvAutoProbe = Configs.iptvAutoProbe
+                    Configs.KEY.EPG_ENABLE -> _epgEnable = Configs.epgEnable
+                    Configs.KEY.EPG_SOURCE_CURRENT -> _epgSourceCurrent = Configs.epgSourceCurrent
+                    Configs.KEY.EPG_SOURCE_LIST -> _epgSourceList = Configs.epgSourceList
+                    Configs.KEY.EPG_REFRESH_TIME_THRESHOLD -> _epgRefreshTimeThreshold = Configs.epgRefreshTimeThreshold
+                    Configs.KEY.EPG_CHANNEL_RESERVE_LIST -> _epgChannelReserveList = Configs.epgChannelReserveList
+                    Configs.KEY.EPG_REFRESH_IDLE_ENABLE -> _epgRefreshIdleEnable = Configs.epgRefreshIdleEnable
+                    Configs.KEY.EPG_REFRESH_IDLE_DELAY -> _epgRefreshIdleDelay = Configs.epgRefreshIdleDelay
+                    Configs.KEY.UI_SHOW_EPG_PROGRAMME_PROGRESS -> _uiShowEpgProgrammeProgress = Configs.uiShowEpgProgrammeProgress
+                    Configs.KEY.UI_SHOW_EPG_PROGRAMME_PERMANENT_PROGRESS -> _uiShowEpgProgrammePermanentProgress = Configs.uiShowEpgProgrammePermanentProgress
+                    Configs.KEY.UI_SHOW_CHANNEL_LOGO -> _uiShowChannelLogo = Configs.uiShowChannelLogo
+                    Configs.KEY.UI_USE_CLASSIC_PANEL_SCREEN -> _uiUseClassicPanelScreen = Configs.uiUseClassicPanelScreen
+                    Configs.KEY.UI_DENSITY_SCALE_RATIO -> _uiDensityScaleRatio = Configs.uiDensityScaleRatio
+                    Configs.KEY.UI_FONT_SCALE_RATIO -> _uiFontScaleRatio = Configs.uiFontScaleRatio
+                    Configs.KEY.UI_TIME_SHOW_MODE -> _uiTimeShowMode = Configs.uiTimeShowMode
+                    Configs.KEY.UI_FOCUS_OPTIMIZE -> _uiFocusOptimize = Configs.uiFocusOptimize
+                    Configs.KEY.UI_SCREEN_AUTO_CLOSE_DELAY -> _uiScreenAutoCloseDelay = Configs.uiScreenAutoCloseDelay
+                    Configs.KEY.UPDATE_FORCE_REMIND -> _updateForceRemind = Configs.updateForceRemind
+                    Configs.KEY.UPDATE_CHANNEL -> _updateChannel = Configs.updateChannel
+                    Configs.KEY.VIDEO_PLAYER_USER_AGENT -> _videoPlayerUserAgent = Configs.videoPlayerUserAgent
+                    Configs.KEY.VIDEO_PLAYER_LOAD_TIMEOUT -> _videoPlayerLoadTimeout = Configs.videoPlayerLoadTimeout
+                    Configs.KEY.VIDEO_PLAYER_DISPLAY_MODE -> _videoPlayerAspectRatio = Configs.videoPlayerDisplayMode
+                    Configs.KEY.VIDEO_PLAYER_FORCE_AUDIO_SOFT_DECODE -> _videoPlayerForceAudioSoftDecode = Configs.videoPlayerForceSoftDecode
+                    Configs.KEY.VIDEO_PLAYER_RENDER_MODE -> _videoPlayerRenderMode = Configs.videoPlayerRenderMode
+                    Configs.KEY.VIDEO_PLAYER_TYPE -> {
+                        _videoPlayerType = Configs.videoPlayerType
+                        onVideoPlayerTypeChanged?.invoke(_videoPlayerType)
+                    }
+                    Configs.KEY.VIDEO_PLAYER_STOP_PREVIOUS_MEDIA_ITEM -> _videoPlayerStopPreviousMediaItem = Configs.videoPlayerStopPreviousMediaItem
+                    Configs.KEY.VIDEO_PLAYER_SKIP_MULTIPLE_FRAMES_ON_SAME_VSYNC -> _videoPlayerSkipMultipleFramesOnSameVSync = Configs.videoPlayerSkipMultipleFramesOnSameVSync
+                    Configs.KEY.VIDEO_PLAYER_AUTO_FILL_FOR_SD -> _videoPlayerAutoFillForSD = Configs.videoPlayerAutoFillForSD
+                    else -> {}
+                }
+            }
+        }
     }
 
     @OptIn(coil.annotation.ExperimentalCoilApi::class)

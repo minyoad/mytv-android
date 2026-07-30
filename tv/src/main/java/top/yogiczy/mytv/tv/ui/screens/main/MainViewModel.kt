@@ -59,6 +59,20 @@ class MainViewModel(
     init {
         init()
         initIdleRefresh()
+        initSettingsListener()
+    }
+
+    private fun initSettingsListener() {
+        viewModelScope.launch {
+            Configs.onKeyChanged.collect { key ->
+                when (key) {
+                    Configs.KEY.EPG_REFRESH_IDLE_ENABLE, Configs.KEY.EPG_REFRESH_IDLE_DELAY -> {
+                        idleSettingsFlow.value = Pair(Configs.epgRefreshIdleEnable, Configs.epgRefreshIdleDelay)
+                    }
+                    else -> {}
+                }
+            }
+        }
     }
 
     fun init() {

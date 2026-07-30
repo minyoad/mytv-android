@@ -1,5 +1,12 @@
 package top.yogiczy.mytv.tv.ui.screens.settings.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -27,21 +34,30 @@ fun SettingsCategoryContent(
     ) {
         Text(text = currentCategory.title, style = MaterialTheme.typography.headlineSmall)
 
-        when (currentCategory) {
-            SettingsCategories.APP -> SettingsCategoryApp()
-            SettingsCategories.IPTV -> SettingsCategoryIptv(
-                channelGroupListProvider = channelGroupListProvider,
-            )
+        AnimatedContent(
+            targetState = currentCategory,
+            transitionSpec = {
+                (slideInHorizontally(animationSpec = tween(300)) { it / 2 } + fadeIn())
+                    .togetherWith(slideOutHorizontally(animationSpec = tween(300)) { -it / 2 } + fadeOut())
+            },
+            label = "settings_content_animation"
+        ) { targetCategory ->
+            when (targetCategory) {
+                SettingsCategories.APP -> SettingsCategoryApp()
+                SettingsCategories.IPTV -> SettingsCategoryIptv(
+                    channelGroupListProvider = channelGroupListProvider,
+                )
 
-            SettingsCategories.EPG -> SettingsCategoryEpg()
-            SettingsCategories.EPG_RESERVE -> SettingsCategoryEpgReserve()
-            SettingsCategories.FAVORITE -> SettingsCategoryFavorite()
-            SettingsCategories.UI -> SettingsCategoryUI()
-            SettingsCategories.VIDEO_PLAYER -> SettingsCategoryVideoPlayer()
-            SettingsCategories.DEBUG -> SettingsCategoryDebug()
-            SettingsCategories.LOG -> SettingsCategoryLog()
-            SettingsCategories.MORE -> SettingsCategoryPush()
-            SettingsCategories.ABOUT -> SettingsCategoryAbout()
+                SettingsCategories.EPG -> SettingsCategoryEpg()
+                SettingsCategories.EPG_RESERVE -> SettingsCategoryEpgReserve()
+                SettingsCategories.FAVORITE -> SettingsCategoryFavorite()
+                SettingsCategories.UI -> SettingsCategoryUI()
+                SettingsCategories.VIDEO_PLAYER -> SettingsCategoryVideoPlayer()
+                SettingsCategories.DEBUG -> SettingsCategoryDebug()
+                SettingsCategories.LOG -> SettingsCategoryLog()
+                SettingsCategories.MORE -> SettingsCategoryPush()
+                SettingsCategories.ABOUT -> SettingsCategoryAbout()
+            }
         }
     }
 }

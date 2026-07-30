@@ -1,5 +1,6 @@
 package top.yogiczy.mytv.tv.ui.screens.classicchannel.components
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -212,6 +214,8 @@ private fun ClassicChannelItem(
 
     var isFocused by remember { mutableStateOf(false) }
 
+    val scale by animateFloatAsState(if (isFocused) 1.05f else 1f, label = "scale")
+
     LaunchedEffect(Unit) {
         if (initialFocusedProvider()) {
             onInitialFocused()
@@ -238,7 +242,9 @@ private fun ClassicChannelItem(
             }
         }
 
-        Box(modifier = modifier.clip(ListItemDefaults.shape().shape)) {
+        Box(modifier = modifier
+            .scale(scale)
+            .clip(ListItemDefaults.shape().shape)) {
             DenseListItem(
                 modifier = Modifier
                     .focusRequester(focusRequester)

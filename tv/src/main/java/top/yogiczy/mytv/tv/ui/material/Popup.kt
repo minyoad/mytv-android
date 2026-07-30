@@ -1,5 +1,10 @@
 package top.yogiczy.mytv.tv.ui.material
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -74,20 +79,26 @@ fun PopupContent(
     withBackground: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    if (!visibleProvider()) return
-
-    Box(
-        modifier
-            .fillMaxSize()
-            .popupable()
-            .pointerInput(Unit) { detectTapGestures { onDismissRequest?.invoke() } }
-            .captureBackKey { onDismissRequest?.invoke() }
-            .ifElse(
-                withBackground,
-                Modifier.background(MaterialTheme.colorScheme.background.copy(0.5f)),
-            ),
+    AnimatedVisibility(
+        visible = visibleProvider(),
+        enter = fadeIn() + scaleIn(initialScale = 0.9f),
+        exit = fadeOut() + scaleOut(targetScale = 0.9f),
     ) {
-        content()
+        Box(
+            Modifier
+                .fillMaxSize()
+                .popupable()
+                .pointerInput(Unit) { detectTapGestures { onDismissRequest?.invoke() } }
+                .captureBackKey { onDismissRequest?.invoke() }
+                .ifElse(
+                    withBackground,
+                    Modifier.background(MaterialTheme.colorScheme.background.copy(0.5f)),
+                ),
+        ) {
+            Box(modifier) {
+                content()
+            }
+        }
     }
 }
 

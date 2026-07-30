@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,17 +29,9 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     channelGroupListProvider: () -> ChannelGroupList = { ChannelGroupList() },
     onClose: () -> Unit = {},
-    settingsViewModel: SettingsViewModel = viewModel(),
 ) {
     val childPadding = rememberChildPadding()
     var currentCategory by remember { mutableStateOf(SettingsCategories.entries.first()) }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1000)
-            settingsViewModel.refresh()
-        }
-    }
 
     Box(
         modifier = modifier

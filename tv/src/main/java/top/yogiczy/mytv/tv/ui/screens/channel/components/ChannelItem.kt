@@ -1,5 +1,6 @@
 package top.yogiczy.mytv.tv.ui.screens.channel.components
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -22,7 +23,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.tooling.preview.Preview
@@ -57,6 +61,8 @@ fun ChannelItem(
     var isFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
+    val scale by animateFloatAsState(if (isFocused) 1.1f else 1f, label = "scale")
+
     LaunchedEffect(Unit) {
         if (initialFocused) {
             onInitialFocused()
@@ -68,6 +74,11 @@ fun ChannelItem(
         onClick = {},
         modifier = modifier
             .width(124.dp)
+            .scale(scale)
+            .ifElse(
+                isFocused,
+                Modifier.shadow(12.dp, MaterialTheme.shapes.medium, spotColor = MaterialTheme.colorScheme.primary)
+            )
             .focusRequester(focusRequester)
             .onFocusChanged { isFocused = it.isFocused || it.hasFocus }
             .handleKeyEvents(
@@ -79,7 +90,7 @@ fun ChannelItem(
             focusedContainerColor = MaterialTheme.colorScheme.onSurface,
         ),
         border = CardDefaults.border(
-            focusedBorder = Border(BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface)),
+            focusedBorder = Border(BorderStroke(2.dp, MaterialTheme.colorScheme.primary)),
         ),
     ) {
         Column {
