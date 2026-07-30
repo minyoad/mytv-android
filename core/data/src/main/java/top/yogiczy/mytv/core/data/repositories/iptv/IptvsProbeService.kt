@@ -36,6 +36,10 @@ data class SimpleSourceListResponse(val sources: List<SimpleSourceItem>)
 
 @OptIn(InternalSerializationApi::class)
 @Serializable
+data class IpDetectResponse(val ip: String, val isp: String, val province: String)
+
+@OptIn(InternalSerializationApi::class)
+@Serializable
 data class ProbeResult(val sourceId: String, val channelId: String, val status: String, val latency: Long)
 
 @OptIn(InternalSerializationApi::class)
@@ -56,9 +60,13 @@ typealias DeepProbeHandler = suspend (url: String) -> Long?
  */
 object IptvsProbeService {
     private val log = Logger.create("IptvsProbeService")
+    private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) IPTVProbe/2.0"
+    private const val PHASE_I_TIMEOUT = 2500L // 毫秒
+
     private val probeClient = OkHttp.client.newBuilder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(PHASE_I_TIMEOUT, TimeUnit.MILLISECONDS)
+        .readTimeout(PHASE_I_TIMEOUT, TimeUnit.MILLISECONDS)
+        .followRedirects(false)
         .build()
 
     private val apiClient = OkHttp.client.newBuilder()
@@ -85,6 +93,34 @@ object IptvsProbeService {
     ) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                var currentIsp = isp
+                var currentProvince = province
+
+                // 自动检测当前设备网络环境
+                if (currentIsp == "AUTO" || currentProvince == "AUTO") {
+                    log.i("正在自动检测本机 IP 与网络环境归属...")
+                    runCatching {
+                        val detectUrl = serverBaseUrl.toHttpUrlOrNull()
+                            ?.newBuilder()
+                            ?.addPathSegments("api/sources/detect-ip")
+                            ?.build() ?: throw IOException("无效的 BaseUrl: $serverBaseUrl")
+                        
+                        val request = Request.Builder().url(detectUrl).header("User-Agent", USER_AGENT).get().build()
+                        apiClient.newCall(request).execute().use { response ->
+                            if (response.isSuccessful) {
+                                val body = response.body?.string() ?: ""
+                                val detectData = json.decodeFromString<IpDetectResponse>(body)
+                                currentIsp = detectData.isp
+                                currentProvince = detectData.province
+                                log.i("网络环境自动识别成功: $currentProvince - $currentIsp (IP: ${detectData.ip})")
+                            }
+                        }
+                    }.onFailure { log.e("自动检测网络环境失败", it) }
+                    
+                    if (currentIsp == "AUTO") currentIsp = "未知"
+                    if (currentProvince == "AUTO") currentProvince = "未知"
+                }
+
                 var page = 1
                 val limit = 100
                 var totalSuccessCount = 0
@@ -95,7 +131,7 @@ object IptvsProbeService {
                     log.i("正在拉取最新的 IPTV 电视频道播放线路: $serverBaseUrl (第 $currentPage 页)")
                     
                     val result = runCatching {
-                        val sources = fetchSourcesPage(serverBaseUrl, isp, province, onlyActive, currentPage, limit)
+                        val sources = fetchSourcesPage(serverBaseUrl, currentIsp, currentProvince, onlyActive, currentPage, limit)
                         
                         if (sources.isEmpty()) {
                             if (currentPage == 1) log.w("拉取到的可测试频道和线路为空")
@@ -106,7 +142,7 @@ object IptvsProbeService {
                         val allSourcesToTest = sources.map { Triple(it.id, it.channelId, it.url) }
 
                         log.i("第 $currentPage 页待测物理流: ${allSourcesToTest.size}，开始并发测速（第一阶段：快速嗅探）...")
-                        val fastResults = runConcurrentProbe(allSourcesToTest, maxConcurrency = 4)
+                        val fastResults = runConcurrentProbe(allSourcesToTest, maxConcurrency = 10)
 
                         var finalResults = fastResults
 
@@ -141,7 +177,7 @@ object IptvsProbeService {
                         
                         // 稍微延迟一下，避开测速时的网络竞争
                         delay(500)
-                        val count = submitReport(serverBaseUrl, isp, province, finalResults)
+                        val count = submitReport(serverBaseUrl, currentIsp, currentProvince, finalResults)
                         log.i("第 $currentPage 页数据上报完成，生效 $count 条报告")
                         totalSuccessCount += count
 
@@ -217,13 +253,13 @@ object IptvsProbeService {
         val startTime = System.currentTimeMillis()
         try {
             if (url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true)) {
-                val headRequest = Request.Builder().url(url).head().build()
+                val headRequest = Request.Builder().url(url).header("User-Agent", USER_AGENT).head().build()
                 try {
                     probeClient.newCall(headRequest).execute().use { response ->
+                        // 2xx 成功 / 3xx 重定向 均视为源 URL 可达
                         if (response.isSuccessful || response.code in 300..399) {
                             return "active" to (System.currentTimeMillis() - startTime)
                         }
-                        // 某些服务器返回 405 或 403 可能仍可用，尝试 TCP 探测
                     }
                 } catch (e: Exception) {
                     // HEAD 请求超时或异常，尝试 TCP 探测保底
@@ -250,7 +286,7 @@ object IptvsProbeService {
                 }
 
                 Socket().use { socket ->
-                    socket.connect(InetSocketAddress(host, port), 10000)
+                    socket.connect(InetSocketAddress(host, port), PHASE_I_TIMEOUT.toInt())
                     return "active" to (System.currentTimeMillis() - startTime)
                 }
             }
