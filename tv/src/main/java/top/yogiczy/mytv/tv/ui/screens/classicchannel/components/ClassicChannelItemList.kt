@@ -138,7 +138,7 @@ fun ClassicChannelItemList(
         contentPadding = PaddingValues(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        itemsIndexed(channelList, key = { _, channel -> channel.hashCode() }) { index, channel ->
+        itemsIndexed(channelList, key = { _, channel -> channel.name + channel.urlList.firstOrNull() }) { index, channel ->
             val isSelected by remember { derivedStateOf { channel == focusedChannel } }
             val initialFocused by remember {
                 derivedStateOf { !hasFocused && channel == initialChannel }

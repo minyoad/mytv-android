@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -108,6 +109,20 @@ fun ClassicChannelScreen(
     }
     var focusedChannel by remember { mutableStateOf(currentChannelProvider()) }
     var epgListVisible by remember { mutableStateOf(false) }
+
+    // 💡 优化：当全局数据刷新时，同步更新本地选中的分组引用，防止实例过期导致状态丢失
+    LaunchedEffect(channelGroupList) {
+        if (focusedChannelGroup != ClassicPanelScreenFavoriteChannelGroup) {
+            channelGroupList.find { it.name == focusedChannelGroup.name }?.let {
+                focusedChannelGroup = it
+                
+                // 同时同步当前选中的频道实例，确保引用最新，避免焦点判定失效
+                it.channelList.find { c -> c.name == focusedChannel.name }?.let { c ->
+                    focusedChannel = c
+                }
+            }
+        }
+    }
 
     var groupWidth by remember { mutableIntStateOf(0) }
     var channelListWidth by remember { mutableIntStateOf(0) }

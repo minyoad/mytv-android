@@ -61,7 +61,7 @@ fun ChannelItemList(
     ) {
         items(
             items = channelList,
-            key = { it.name } // 使用频道名称作为唯一键
+            key = { it.name + it.urlList.firstOrNull() } // 使用频道名称和首个 URL 组合作为唯一键
         ) { channel ->
             ChannelItem(
                 channelProvider = { channel },

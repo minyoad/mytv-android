@@ -25,6 +25,7 @@ class IdGenerator {
         currentId = 0
     }
 }
+
 /**
  * 直播源数据获取
  */
@@ -95,7 +96,7 @@ class IptvRepository(
         val startTime = System.currentTimeMillis()
         val groupList = parser.parse(sourceData)
 
-        // 在获取到频道列表后，统一生成频道id
+        // 在获取到频道列表后，统一生成数字序号 ID
         idGenerator.reset()
         val groupListWithIds = ChannelGroupList(
             value = groupList.map { group ->
