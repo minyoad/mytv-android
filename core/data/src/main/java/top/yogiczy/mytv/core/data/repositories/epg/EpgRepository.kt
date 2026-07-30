@@ -16,8 +16,10 @@ import top.yogiczy.mytv.core.data.network.OkHttp
 import top.yogiczy.mytv.core.data.network.await
 import top.yogiczy.mytv.core.data.repositories.FileCacheRepository
 import top.yogiczy.mytv.core.data.repositories.epg.fetcher.EpgFetcher.Companion.fetchStream
+import top.yogiczy.mytv.core.data.utils.ChannelUtil
 import top.yogiczy.mytv.core.data.utils.Constants
 import top.yogiczy.mytv.core.data.utils.Logger
+import top.yogiczy.mytv.core.data.utils.SP
 import top.yogiczy.mytv.core.util.utils.removeBom
 import java.io.File
 import java.io.FileInputStream
@@ -76,7 +78,7 @@ class EpgRepository(
                         val depth = parser.depth
                         while (!(parser.next() == XmlPullParser.END_TAG && parser.depth == depth)) {
                             if (parser.eventType == XmlPullParser.START_TAG && parser.name == "display-name") {
-                                name = getSafeText()
+                                name = ChannelUtil.standardChannelName(getSafeText())
                             }
                         }
 
@@ -184,6 +186,11 @@ private class EpgXmlRepository(
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
+    private val etagKey = "epg_etag_${url.hashCode().toUInt().toString(16)}"
+    private var etag: String
+        get() = SP.getString(etagKey, "")
+        set(value) = SP.putString(etagKey, value)
+
     /**
      * 获取并缓存远程xml
      */
@@ -192,11 +199,22 @@ private class EpgXmlRepository(
         while (retryCount <= Constants.HTTP_RETRY_COUNT) {
             try {
                 log.i("下载节目单xml (第 ${retryCount + 1}/${Constants.HTTP_RETRY_COUNT + 1} 次): $url")
-                val request = Request.Builder().url(url).build()
+                val request = Request.Builder().url(url).apply {
+                    if (etag.isNotEmpty() && file.exists()) {
+                        header("If-None-Match", etag)
+                    }
+                }.build()
 
                 epgClient.newCall(request).execute().use { response ->
+                    if (response.code == 304) {
+                        log.i("节目单内容未变动 (304 Not Modified): $url")
+                        file.setLastModified(System.currentTimeMillis())
+                        return@withContext
+                    }
+
                     if (!response.isSuccessful) throw Exception("${response.code}: ${response.message}")
 
+                    etag = response.header("ETag") ?: ""
                     response.fetchStream().use { inputStream ->
                         file.outputStream().use { outputStream ->
                             inputStream.copyTo(outputStream)
@@ -221,10 +239,9 @@ private class EpgXmlRepository(
      */
     suspend fun getEpgXmlFile(): File = withContext(Dispatchers.IO) {
         val file = getCacheFile()
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         
         val isExpired = !file.exists() || 
-                dateFormat.format(System.currentTimeMillis()) != dateFormat.format(file.lastModified())
+                System.currentTimeMillis() - file.lastModified() >= 30 * 60 * 1000
 
         if (isExpired) {
             try {

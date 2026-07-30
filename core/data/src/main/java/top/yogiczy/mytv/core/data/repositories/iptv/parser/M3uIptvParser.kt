@@ -6,6 +6,7 @@ import top.yogiczy.mytv.core.data.entities.channel.Channel
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroup
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelList
+import top.yogiczy.mytv.core.data.utils.ChannelUtil
 import top.yogiczy.mytv.core.util.utils.removeBom
 
 /**
@@ -34,7 +35,7 @@ class M3uIptvParser : IptvParser {
             if (!line.startsWith("#EXTINF")) return@forEachIndexed
 
             val name = line.substringAfterLast(",").trim()
-            val channelName = extractAttribute(line, "tvg-name") ?: name
+            val channelName = ChannelUtil.standardChannelName(extractAttribute(line, "tvg-name") ?: name)
             val groupName = extractAttribute(line, "group-title") ?: "其他"
             val logo = extractAttribute(line, "tvg-logo") ?: extractAttribute(line, "logo")
             val url = lines.getOrNull(index + 1)?.trim()
