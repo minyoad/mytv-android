@@ -38,9 +38,21 @@ class M3uIptvParser : IptvParser {
             val channelName = ChannelUtil.standardChannelName(extractAttribute(line, "tvg-name") ?: name)
             val groupName = extractAttribute(line, "group-title") ?: "其他"
             val logo = extractAttribute(line, "tvg-logo") ?: extractAttribute(line, "logo")
-            val url = lines.getOrNull(index + 1)?.trim()
+            
+            // 💡 优化：向后查找真正的 URL，跳过空行和其他标签行
+            var url: String? = null
+            for (i in (index + 1)..<lines.size) {
+                val nextLine = lines[i].trim()
+                if (nextLine.isBlank()) continue
+                if (nextLine.startsWith("#")) {
+                    if (nextLine.startsWith("#EXTINF")) break // 遇到下一个频道标签，说明当前频道无 URL
+                    continue
+                }
+                url = nextLine
+                break
+            }
 
-            if (!url.isNullOrBlank() && !url.startsWith("#")) {
+            if (!url.isNullOrBlank()) {
                 iptvList.add(
                     IptvResponseItem(
                         name = name,

@@ -236,11 +236,15 @@ class MainViewModel(
             .map {
                 // 只有当数据真的变化时才更新 UI，避免冗余刷新
                 val currentState = _uiState.value
-                if (currentState !is MainUiState.Ready || currentState.channelGroupList != it) {
+                val isPopulated = it.channelList.isNotEmpty()
+
+                if (currentState !is MainUiState.Ready || (isPopulated && currentState.channelGroupList != it)) {
                     _uiState.value = MainUiState.Ready(
                         channelGroupList = it,
                         epgList = (currentState as? MainUiState.Ready)?.epgList ?: EpgList()
                     )
+                } else if (!isPopulated && !showLoading) {
+                    log.w("后台刷新直播源获取到空列表，已忽略以防止 UI 变空")
                 }
                 it
             }
