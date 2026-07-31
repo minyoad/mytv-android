@@ -63,7 +63,6 @@ fun Modifier.popupable() = composed {
     val focusRequester = remember { FocusRequester() }
 
     DisposableEffect(Unit) {
-        focusRequester.saveRequestFocus()
         popupManager.push(focusRequester)
         onDispose { popupManager.pop() }
     }
@@ -113,9 +112,9 @@ fun SimplePopup(
     val key = remember { UUID.randomUUID().toString() }
     val popupState = LocalPopupState.current
 
-    if (visible) {
-        popupState.add(
-            PopupState(
+    DisposableEffect(visible) {
+        if (visible) {
+            val state = PopupState(
                 key = key,
                 composableReference = {
                     PopupContent(
@@ -126,10 +125,15 @@ fun SimplePopup(
                         content = content,
                     )
                 },
-            ),
-        )
-    } else {
-        popupState.remove(popupState.find { it.key == key })
+            )
+            popupState.add(state)
+        } else {
+            popupState.find { it.key == key }?.let { popupState.remove(it) }
+        }
+
+        onDispose {
+            popupState.find { it.key == key }?.let { popupState.remove(it) }
+        }
     }
 }
 
