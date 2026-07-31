@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -53,8 +54,9 @@ fun ChannelItemGroupList(
 
     val childPadding = rememberChildPadding()
 
-    val groupListState =
-        rememberLazyListState(max(0, channelGroupList.channelGroupIdx(currentChannel)))
+    val groupListState = remember(channelGroupList) {
+        LazyListState(max(0, channelGroupList.channelGroupIdx(currentChannel)))
+    }
     var hasInitialFocused by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(groupListState) {
@@ -71,7 +73,7 @@ fun ChannelItemGroupList(
     ) {
         itemsIndexed(
             items = channelGroupList,
-            key = { _, group -> group.name } // 使用分组名称作为唯一键
+            key = { index, group -> group.name + index } // 确保唯一性
         ) { index, channelGroup ->
             Row(
                 modifier = Modifier.padding(start = childPadding.start),

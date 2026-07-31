@@ -3,13 +3,14 @@ package top.yogiczy.mytv.tv.ui.screens.channel.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -43,7 +44,9 @@ fun ChannelItemList(
     val currentChannel = currentChannelProvider()
 
     val childPadding = rememberChildPadding()
-    val listState = rememberLazyListState(max(0, channelList.indexOf(currentChannel) - 2))
+    val listState = remember(channelList) {
+        LazyListState(max(0, channelList.indexOf(currentChannel) - 2))
+    }
     var hasItemFocused by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(listState) {

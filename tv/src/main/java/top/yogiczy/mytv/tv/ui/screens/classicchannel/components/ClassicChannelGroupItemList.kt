@@ -8,8 +8,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -61,7 +61,9 @@ fun ClassicChannelGroupItemList(
 
     var focusedChannelGroup by remember { mutableStateOf(initialChannelGroup) }
 
-    val listState = rememberLazyListState(max(0, channelGroupList.indexOf(initialChannelGroup) - 2))
+    val listState = remember(channelGroupList) {
+        LazyListState(max(0, channelGroupList.indexOf(initialChannelGroup) - 2))
+    }
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }
             .distinctUntilChanged()
@@ -105,7 +107,7 @@ fun ClassicChannelGroupItemList(
         contentPadding = PaddingValues(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        itemsIndexed(channelGroupList, key = { _, group -> group.name }) { index, channelGroup ->
+        itemsIndexed(channelGroupList, key = { index, group -> group.name + index }) { index, channelGroup ->
             val isSelected by remember { derivedStateOf { channelGroup == focusedChannelGroup } }
 
             ClassicChannelGroupItem(

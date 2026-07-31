@@ -3,6 +3,9 @@ package top.yogiczy.mytv.tv.ui.screens.main.components
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -67,15 +70,19 @@ fun MainContent(
 ) {
     val context = LocalContext.current
 
+    val filteredChannelGroupList by remember {
+        derivedStateOf { filteredChannelGroupListProvider() }
+    }
+
     val videoPlayerState =
         rememberVideoPlayerState(defaultDisplayModeProvider = { settingsViewModel.videoPlayerDisplayMode })
     val mainContentState = rememberMainContentState(
         videoPlayerState = videoPlayerState,
-        channelGroupListProvider = filteredChannelGroupListProvider,
+        channelGroupListProvider = { filteredChannelGroupList },
     )
     val channelNumberSelectState = rememberChannelNumberSelectState {
         val idx = it.toInt() - 1
-        filteredChannelGroupListProvider().channelList.getOrNull(idx)?.let { channel ->
+        filteredChannelGroupList.channelList.getOrNull(idx)?.let { channel ->
             mainContentState.changeCurrentChannel(channel)
         }
     }
@@ -235,7 +242,7 @@ fun MainContent(
         ChannelTempScreen(
             channelProvider = { mainContentState.currentChannel },
             channelUrlIdxProvider = { mainContentState.currentChannelUrlIdx },
-            channelNumberProvider = { filteredChannelGroupListProvider().channelIdx(mainContentState.currentChannel) + 1 },
+            channelNumberProvider = { filteredChannelGroupList.channelIdx(mainContentState.currentChannel) + 1 },
             showChannelLogoProvider = { settingsViewModel.uiShowChannelLogo },
             recentEpgProgrammeProvider = {
                 epgListProvider().recentProgramme(mainContentState.currentChannel)
@@ -357,7 +364,7 @@ fun MainContent(
             currentChannelProvider = { mainContentState.currentChannel },
             currentChannelUrlIdxProvider = { mainContentState.currentChannelUrlIdx },
             currentChannelNumberProvider = {
-                (filteredChannelGroupListProvider().channelList.indexOf(mainContentState.currentChannel) + 1).toString()
+                (filteredChannelGroupList.channelList.indexOf(mainContentState.currentChannel) + 1).toString()
             },
             showChannelLogoProvider = { settingsViewModel.uiShowChannelLogo },
             epgListProvider = epgListProvider,
@@ -397,7 +404,7 @@ fun MainContent(
         onDismissRequest = { mainContentState.isChannelScreenVisible = false },
     ) {
         ChannelScreen(
-            channelGroupListProvider = filteredChannelGroupListProvider,
+            channelGroupListProvider = { filteredChannelGroupList },
             currentChannelProvider = { mainContentState.currentChannel },
             currentChannelUrlIdxProvider = { mainContentState.currentChannelUrlIdx },
             showChannelLogoProvider = { settingsViewModel.uiShowChannelLogo },
@@ -425,12 +432,12 @@ fun MainContent(
         onDismissRequest = { mainContentState.isChannelScreenVisible = false },
     ) {
         ClassicChannelScreen(
-            channelGroupListProvider = filteredChannelGroupListProvider,
+            channelGroupListProvider = { filteredChannelGroupList },
             currentChannelProvider = { mainContentState.currentChannel },
             currentChannelUrlIdxProvider = { mainContentState.currentChannelUrlIdx },
             favoriteChannelListProvider = {
                 val favoriteChannelNameList = settingsViewModel.iptvChannelFavoriteList
-                ChannelList(filteredChannelGroupListProvider().channelList
+                ChannelList(filteredChannelGroupList.channelList
                     .filter { favoriteChannelNameList.contains(it.name) })
             },
             showChannelLogoProvider = { settingsViewModel.uiShowChannelLogo },
