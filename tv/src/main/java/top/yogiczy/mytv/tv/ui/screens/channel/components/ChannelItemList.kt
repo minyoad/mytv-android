@@ -35,6 +35,8 @@ fun ChannelItemList(
     onChannelFavoriteToggle: (Channel) -> Unit = {},
     epgListProvider: () -> EpgList = { EpgList() },
     showEpgProgrammeProgressProvider: () -> Boolean = { false },
+    initialFocusedProvider: () -> Boolean = { true },
+    onInitialFocused: () -> Unit = {},
     onUserAction: () -> Unit = {},
 ) {
     val channelList = channelListProvider()
@@ -70,8 +72,13 @@ fun ChannelItemList(
                 onChannelFavoriteToggle = { onChannelFavoriteToggle(channel) },
                 recentEpgProgrammeProvider = { epgListProvider().recentProgramme(channel) },
                 showEpgProgrammeProgressProvider = showEpgProgrammeProgressProvider,
-                initialFocusedProvider = { channel == currentChannel && !hasItemFocused },
-                onInitialFocused = { hasItemFocused = true },
+                initialFocusedProvider = {
+                    initialFocusedProvider() && channel == currentChannel && !hasItemFocused
+                },
+                onInitialFocused = {
+                    hasItemFocused = true
+                    onInitialFocused()
+                },
             )
         }
     }

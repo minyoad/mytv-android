@@ -11,6 +11,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -50,6 +55,7 @@ fun ChannelItemGroupList(
 
     val groupListState =
         rememberLazyListState(max(0, channelGroupList.channelGroupIdx(currentChannel)))
+    var hasInitialFocused by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(groupListState) {
         snapshotFlow { groupListState.isScrollInProgress }
@@ -93,6 +99,8 @@ fun ChannelItemGroupList(
                 onChannelFavoriteToggle = onChannelFavoriteToggle,
                 epgListProvider = epgListProvider,
                 showEpgProgrammeProgressProvider = showEpgProgrammeProgressProvider,
+                initialFocusedProvider = { !hasInitialFocused },
+                onInitialFocused = { hasInitialFocused = true },
                 onUserAction = onUserAction,
             )
         }

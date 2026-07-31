@@ -97,14 +97,15 @@ fun ClassicChannelGroupItemList(
             .ifElse(
                 LocalSettings.current.uiFocusOptimize,
                 Modifier.saveFocusRestorer {
-                    itemFocusRequesterList[channelGroupList.indexOf(focusedChannelGroup)]
+                    itemFocusRequesterList.getOrNull(channelGroupList.indexOf(focusedChannelGroup))
+                        ?: FocusRequester.Default
                 },
             ),
         state = listState,
         contentPadding = PaddingValues(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        itemsIndexed(channelGroupList) { index, channelGroup ->
+        itemsIndexed(channelGroupList, key = { _, group -> group.name }) { index, channelGroup ->
             val isSelected by remember { derivedStateOf { channelGroup == focusedChannelGroup } }
 
             ClassicChannelGroupItem(

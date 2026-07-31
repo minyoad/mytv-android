@@ -86,10 +86,16 @@ fun ClassicChannelItemList(
     val itemFocusRequesterList =
         remember(channelList) { List(channelList.size) { FocusRequester() } }
 
-    var hasFocused by rememberSaveable { mutableStateOf(!channelList.contains(initialChannel)) }
+    var hasFocused by rememberSaveable {
+        mutableStateOf(!channelList.any { it.name == initialChannel.name })
+    }
     var focusedChannel by remember(channelList) {
         mutableStateOf(
-            if (hasFocused) channelList.firstOrNull() ?: Channel() else initialChannel
+            if (hasFocused) {
+                channelList.firstOrNull() ?: Channel()
+            } else {
+                channelList.find { it.name == initialChannel.name } ?: initialChannel
+            }
         )
     }
 
@@ -98,9 +104,10 @@ fun ClassicChannelItemList(
     }
 
     val listState = remember(channelGroup) {
+        val index = channelList.indexOfFirst { it.name == initialChannel.name }
         LazyListState(
-            if (hasFocused) 0
-            else max(0, channelList.indexOf(initialChannel) - 2)
+            if (hasFocused || index == -1) 0
+            else max(0, index - 2)
         )
     }
     LaunchedEffect(listState) {
@@ -133,7 +140,8 @@ fun ClassicChannelItemList(
             .ifElse(
                 LocalSettings.current.uiFocusOptimize,
                 Modifier.saveFocusRestorer {
-                    itemFocusRequesterList[channelList.indexOf(focusedChannel)]
+                    itemFocusRequesterList.getOrNull(channelList.indexOf(focusedChannel))
+                        ?: FocusRequester.Default
                 },
             ),
         state = listState,

@@ -99,26 +99,29 @@ fun ClassicChannelScreen(
             channelGroupList
     }
 
-    var focusedChannelGroup by remember {
+    var focusedChannelGroup by remember(channelGroupList) {
+        val currentChannel = currentChannelProvider()
         mutableStateOf(
             if (channelFavoriteListVisible)
                 ClassicPanelScreenFavoriteChannelGroup
             else
-                channelGroupList[max(0, channelGroupList.channelGroupIdx(currentChannelProvider()))]
+                channelGroupList.find { it.channelList.any { c -> c.name == currentChannel.name } }
+                    ?: channelGroupList.getOrNull(max(0, channelGroupList.channelGroupIdx(currentChannel)))
+                    ?: ChannelGroup()
         )
     }
     var focusedChannel by remember { mutableStateOf(currentChannelProvider()) }
     var epgListVisible by remember { mutableStateOf(false) }
 
-    // 💡 优化：当全局数据刷新时，同步更新本地选中的分组引用，防止实例过期导致状态丢失
+    // 💡 优化：当全局数据刷新时，通过名称同步更新本地选中的引用，防止实例过期导致状态丢失
     LaunchedEffect(channelGroupList) {
         if (focusedChannelGroup != ClassicPanelScreenFavoriteChannelGroup) {
-            channelGroupList.find { it.name == focusedChannelGroup.name }?.let {
-                focusedChannelGroup = it
+            channelGroupList.find { it.name == focusedChannelGroup.name }?.let { newGroup ->
+                focusedChannelGroup = newGroup
                 
-                // 同时同步当前选中的频道实例，确保引用最新，避免焦点判定失效
-                it.channelList.find { c -> c.name == focusedChannel.name }?.let { c ->
-                    focusedChannel = c
+                // 同时同步当前选中的频道实例
+                newGroup.channelList.find { c -> c.name == focusedChannel.name }?.let { newChannel ->
+                    focusedChannel = newChannel
                 }
             }
         }
