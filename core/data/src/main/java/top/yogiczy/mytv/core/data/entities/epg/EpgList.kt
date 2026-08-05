@@ -32,7 +32,8 @@ data class EpgList(
             if (isEmpty()) return null
 
             return matchCache.getOrPut(channel.epgName) {
-                firstOrNull { epg -> epg.channel.equals(channel.epgName, ignoreCase = true) } ?: Epg()
+                firstOrNull { epg -> epg.channel.equals(channel.epgName, ignoreCase = true) }
+                    ?: Epg(channel = channel.epgName)
             }
         }
 

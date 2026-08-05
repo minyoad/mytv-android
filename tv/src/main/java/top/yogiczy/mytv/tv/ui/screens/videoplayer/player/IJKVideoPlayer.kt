@@ -23,7 +23,7 @@ class IJKVideoPlayer(
     private val context: Context,
     private val coroutineScope: CoroutineScope,
 ) : VideoPlayer(coroutineScope) {
-    private val log = Logger.create(javaClass.simpleName)
+    private val log = Logger.create(IJKVideoPlayer::class.java.simpleName)
 
     private var currentUrl: String? = null
     private var retryCount = 0

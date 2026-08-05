@@ -21,14 +21,14 @@ data class Epg(
     val programmeList: List<EpgProgramme> = EpgProgrammeList(),
 ) {
     companion object {
-        private val log = Logger.create(javaClass.simpleName)
+        private val log = Logger.create(Epg::class.java.simpleName)
 
         fun Epg.recentProgramme(): EpgProgrammeRecent {
             val currentTime = System.currentTimeMillis()
 
             // 确保 programmeList 按 startAt 排序
             if (programmeList.isEmpty()) {
-                log.d("No programmes available for channel=${channel}")
+                log.i("No programmes available for channel=${channel}")
                 return EpgProgrammeRecent()
             }
 

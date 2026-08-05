@@ -15,7 +15,7 @@ import top.yogiczy.mytv.tv.ui.material.SnackbarType
 import java.io.File
 
 class UpdateViewModel : ViewModel() {
-    private val log = Logger.create(javaClass.simpleName)
+    private val log = Logger.create(UpdateViewModel::class.java.simpleName)
 
     private var _isChecking = false
     private var _isUpdating = false

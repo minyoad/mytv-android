@@ -5,7 +5,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 
 object SP {
-    private val log = Logger.create(javaClass.simpleName)
+    private val log = Logger.create("SP")
     private const val SP_NAME = "mytv-android"
     private const val SP_MODE = Context.MODE_PRIVATE
     private lateinit var sp: SharedPreferences

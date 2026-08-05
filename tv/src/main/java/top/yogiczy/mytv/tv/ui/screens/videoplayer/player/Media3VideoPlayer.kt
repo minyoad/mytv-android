@@ -36,7 +36,7 @@ class Media3VideoPlayer(
     private val context: Context,
     private val coroutineScope: CoroutineScope,
 ) : VideoPlayer(coroutineScope) {
-    private val log = Logger.create(javaClass.simpleName)
+    private val log = Logger.create(Media3VideoPlayer::class.java.simpleName)
 
     private val videoPlayer by lazy {
         val renderersFactory = DefaultRenderersFactory(context)

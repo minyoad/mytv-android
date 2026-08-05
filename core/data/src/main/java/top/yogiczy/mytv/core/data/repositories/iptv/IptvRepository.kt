@@ -37,7 +37,7 @@ class IptvRepository(
     else "iptv-${source.url.hashCode().toUInt().toString(16)}.txt",
     source.isLocal,
 ) {
-    private val log = Logger.create(javaClass.simpleName)
+    private val log = Logger.create(IptvRepository::class.java.simpleName)
 
     private val idGenerator = IdGenerator()
 

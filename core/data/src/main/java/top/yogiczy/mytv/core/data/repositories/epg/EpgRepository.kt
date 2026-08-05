@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit
 class EpgRepository(
     source: EpgSource,
 ) {
-    private val log = Logger.create(javaClass.simpleName)
+    private val log = Logger.create(EpgRepository::class.java.simpleName)
     private val epgXmlRepository = EpgXmlRepository(source.url)
 
     /**
@@ -180,7 +180,7 @@ class EpgRepository(
 private class EpgXmlRepository(
     private val url: String
 ) : FileCacheRepository("epg-${url.hashCode().toUInt().toString(16)}.xml") {
-    private val log = Logger.create(javaClass.simpleName)
+    private val log = Logger.create(EpgXmlRepository::class.java.simpleName)
     private val epgClient = OkHttp.client.newBuilder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)

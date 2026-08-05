@@ -43,7 +43,7 @@ import java.time.LocalDate
 class MainViewModel(
     application: Application,
 ) : AndroidViewModel(application) {
-    private val log = Logger.create(javaClass.simpleName)
+    private val log = Logger.create(MainViewModel::class.java.simpleName)
     private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Loading())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
