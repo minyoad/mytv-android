@@ -9,7 +9,6 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
 import coil.util.DebugLogger
-import android.os.Build
 import top.yogiczy.mytv.core.data.AppData
 import top.yogiczy.mytv.core.data.network.OkHttp
 

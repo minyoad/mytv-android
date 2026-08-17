@@ -40,7 +40,13 @@ data class IpDetectResponse(val ip: String, val isp: String, val province: Strin
 
 @OptIn(InternalSerializationApi::class)
 @Serializable
-data class ProbeResult(val sourceId: String, val channelId: String, val status: String, val latency: Long)
+data class ProbeResult(
+    val sourceId: String,
+    val channelId: String,
+    val status: String,
+    val latency: Long,
+    val resolution: String? = null, // 可选：探针获取的流画质分辨率 (如 "4K", "1080p", "720p")
+)
 
 @OptIn(InternalSerializationApi::class)
 @Serializable
@@ -51,9 +57,55 @@ data class ReportPayload(val clientIsp: String, val clientProvince: String, val 
 data class ReportResponse(val count: Int)
 
 /**
- * 深度探测函数类型
+ * 深度探测结果
  */
-typealias DeepProbeHandler = suspend (url: String) -> Long?
+data class DeepProbeResult(
+    val latency: Long? = null,      // 播放耗时 (ms)，不可播放为 null
+    val resolution: String? = null, // 探测得到的物理分辨率，如 "4K" / "1080p" / "720p"，无法解析为 null
+)
+
+/**
+ * 深度探测函数类型，返回探测耗时与分辨率
+ */
+typealias DeepProbeHandler = suspend (url: String) -> DeepProbeResult?
+
+// ==================== 服务端异步批量测速相关 ====================
+
+@OptIn(InternalSerializationApi::class)
+@Serializable
+data class ServerTestPayload(
+    val concurrency: Int = 8,                  // [选填] 测速并发线程数 (默认 8)
+    val isp: String? = null,                   // [选填] 按运营商过滤
+    val province: String? = null,              // [选填] 按省份过滤
+    val status: String? = null,                // [选填] 按当前状态过滤 ("active" | "inactive" | "unknown")
+    val sourceIds: List<String>? = null,       // [选填] 指定只测试某几条线路 ID 列表
+)
+
+@OptIn(InternalSerializationApi::class)
+@Serializable
+data class ServerTestSourceResult(
+    val sourceId: String,
+    val status: String? = null,
+    val latency: Long? = null,
+    val resolution: String? = null,
+)
+
+@OptIn(InternalSerializationApi::class)
+@Serializable
+data class ServerTestStatusResponse(
+    val status: String? = null,                // idle / running
+    val total: Int? = null,                    // 总任务数
+    val checked: Int? = null,                  // 已测试数
+    val results: List<ServerTestSourceResult>? = null, // 实时结果列表
+)
+
+@OptIn(InternalSerializationApi::class)
+@Serializable
+data class ApiResponse(
+    val success: Boolean = false,
+    val count: Int = 0,
+    val message: String? = null,
+)
 
 /**
  * IPTVS 线路探测服务
@@ -151,9 +203,12 @@ object IptvsProbeService {
                                 async {
                                     semaphore.withPermit {
                                         val url = allSourcesToTest.find { it.first == res.sourceId }?.third ?: ""
-                                        val deepLatency = deepProbe(url)
-                                        if (deepLatency != null) {
-                                            res.copy(latency = deepLatency)
+                                        val deepResult = deepProbe(url)
+                                        if (deepResult != null && deepResult.latency != null) {
+                                            res.copy(
+                                                latency = deepResult.latency,
+                                                resolution = deepResult.resolution ?: res.resolution,
+                                            )
                                         } else {
                                             res.copy(status = "inactive", latency = 9999L)
                                         }
@@ -334,5 +389,94 @@ object IptvsProbeService {
             val resBody = response.body?.string() ?: return 0
             return json.decodeFromString<ReportResponse>(resBody).count
         }
+    }
+
+    // ==================== 服务端异步批量测速 API ====================
+
+    /**
+     * 触发服务端后台异步并发测速 (POST /api/sources/test)
+     * @return 是否成功触发
+     */
+    fun triggerServerTest(
+        serverBaseUrl: String,
+        concurrency: Int = 8,
+        isp: String? = null,
+        province: String? = null,
+        status: String? = null,
+        sourceIds: List<String>? = null,
+    ): Boolean {
+        val payload = ServerTestPayload(
+            concurrency = concurrency,
+            isp = isp?.takeIf { it.isNotBlank() },
+            province = province?.takeIf { it.isNotBlank() },
+            status = status?.takeIf { it.isNotBlank() },
+            sourceIds = sourceIds?.takeIf { it.isNotEmpty() },
+        )
+        val requestBody = json.encodeToString(payload).toRequestBody(JSON_MEDIA_TYPE)
+        val request = Request.Builder()
+            .url("$serverBaseUrl/api/sources/test")
+            .header("User-Agent", USER_AGENT)
+            .post(requestBody)
+            .build()
+
+        return runCatching {
+            apiClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    log.w("触发服务端测速失败: HTTP ${response.code}, body: ${response.body?.string().orEmpty()}")
+                    return@use false
+                }
+                val body = response.body?.string().orEmpty()
+                runCatching { json.decodeFromString<ApiResponse>(body).success }
+                    .getOrDefault(true)
+            }
+        }.getOrDefault(false)
+    }
+
+    /**
+     * 查询服务端测速任务实时进度 (GET /api/sources/test-status)
+     * @return 测速状态，查询失败返回 null
+     */
+    fun queryServerTestStatus(serverBaseUrl: String): ServerTestStatusResponse? {
+        val httpUrl = serverBaseUrl.toHttpUrlOrNull()
+            ?.newBuilder()
+            ?.addPathSegments("api/sources/test-status")
+            ?.build() ?: return null
+
+        val request = Request.Builder().url(httpUrl).header("User-Agent", USER_AGENT).get().build()
+
+        return runCatching {
+            apiClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    log.w("查询服务端测速状态失败: HTTP ${response.code}")
+                    return@use null
+                }
+                val body = response.body?.string() ?: return@use null
+                runCatching { json.decodeFromString<ServerTestStatusResponse>(body) }
+                    .onFailure { log.e("解析测速状态失败, body: $body", it) }
+                    .getOrNull()
+            }
+        }.getOrNull()
+    }
+
+    /**
+     * 终止服务端测速任务 (POST /api/sources/test-cancel)
+     * @return 是否成功取消
+     */
+    fun cancelServerTest(serverBaseUrl: String): Boolean {
+        val request = Request.Builder()
+            .url("$serverBaseUrl/api/sources/test-cancel")
+            .header("User-Agent", USER_AGENT)
+            .post("{}".toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        return runCatching {
+            apiClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    log.w("取消服务端测速失败: HTTP ${response.code}")
+                    return@use false
+                }
+                true
+            }
+        }.getOrDefault(false)
     }
 }
