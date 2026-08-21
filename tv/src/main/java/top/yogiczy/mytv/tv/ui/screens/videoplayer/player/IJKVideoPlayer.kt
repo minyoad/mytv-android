@@ -45,9 +45,9 @@ class IJKVideoPlayer(
                 "timeout",
                 Configs.videoPlayerLoadTimeout
             )
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 100L)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzedduration", 1)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024 * 10)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 2_000_000L)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzedduration", 1_000_000L)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024 * 512L)
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "fastseek")
         }
     }

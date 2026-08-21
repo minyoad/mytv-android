@@ -204,6 +204,7 @@ object IptvsProbeService {
                                     semaphore.withPermit {
                                         val url = allSourcesToTest.find { it.first == res.sourceId }?.third ?: ""
                                         val deepResult = deepProbe(url)
+                                        log.i("Deep probe result for $url: $deepResult")
                                         if (deepResult != null && deepResult.latency != null) {
                                             res.copy(
                                                 latency = deepResult.latency,
