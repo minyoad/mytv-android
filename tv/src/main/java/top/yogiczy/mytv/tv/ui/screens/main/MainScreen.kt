@@ -42,6 +42,7 @@ import top.yogiczy.mytv.tv.ui.screens.settings.SettingsScreen
 import top.yogiczy.mytv.tv.ui.screens.settings.SettingsViewModel
 import top.yogiczy.mytv.tv.ui.theme.MyTVTheme
 import top.yogiczy.mytv.tv.ui.tooling.PreviewWithLayoutGrids
+import top.yogiczy.mytv.tv.ui.utils.Provinces
 import top.yogiczy.mytv.tv.ui.utils.captureBackKey
 import top.yogiczy.mytv.tv.ui.utils.focusOnLaunched
 import top.yogiczy.mytv.tv.ui.utils.handleKeyEvents
@@ -62,6 +63,16 @@ fun MainScreen(
             settingsViewModel.epgRefreshIdleEnable,
             settingsViewModel.epgRefreshIdleDelay
         )
+    }
+
+    // 首次启动时，若未手动设置省份，则根据当前IP自动解析
+    LaunchedEffect(Unit) {
+        if (settingsViewModel.iptvProvinceCurrent.isBlank()) {
+            val province = Provinces.resolveCurrentProvince()
+            if (province != null && settingsViewModel.iptvProvinceCurrent.isBlank()) {
+                settingsViewModel.iptvProvinceCurrent = province
+            }
+        }
     }
 
     LaunchedEffect(uiState) {
@@ -88,7 +99,18 @@ fun MainScreen(
             modifier = modifier,
             channelGroupListProvider = { s.channelGroupList },
             filteredChannelGroupListProvider = {
-                ChannelGroupList(s.channelGroupList.filter { it.name !in settingsViewModel.iptvChannelGroupHiddenList })
+                val hiddenList = settingsViewModel.iptvChannelGroupHiddenList
+                val provinceFilterEnable = settingsViewModel.iptvProvinceFilterEnable
+                val province = settingsViewModel.iptvProvinceCurrent
+                ChannelGroupList(
+                    s.channelGroupList.filter { group ->
+                        if (group.name in hiddenList) return@filter false
+                        if (provinceFilterEnable && province.isNotBlank()) {
+                            // 保留所选省份的分组 + 非省份分组（如“全部”“央视”等）
+                            group.name.contains(province) || !Provinces.isProvinceGroup(group.name)
+                        } else true
+                    }
+                )
             },
             epgListProvider = { s.epgList },
             onBackPressed = onBackPressed,

@@ -35,6 +35,7 @@ import top.yogiczy.mytv.tv.ui.screens.main.MainViewModel
 import top.yogiczy.mytv.tv.ui.screens.settings.SettingsViewModel
 import top.yogiczy.mytv.tv.ui.utils.Configs
 import top.yogiczy.mytv.tv.ui.utils.IJKProbe
+import top.yogiczy.mytv.tv.ui.utils.Provinces
 
 @Composable
 fun SettingsCategoryIptv(
@@ -202,6 +203,51 @@ fun SettingsCategoryIptv(
                         settingsViewModel.iptvChannelGroupHiddenList = it.toSet()
                     },
                     onClose = { visible = false },
+                )
+            }
+        }
+
+        item {
+            SettingsListItem(
+                headlineContent = "省份过滤",
+                supportingContent = "只显示所选省份的频道分组（分组名为省份或省份+频道），其余省份分组自动隐藏",
+                trailingContent = {
+                    Switch(settingsViewModel.iptvProvinceFilterEnable, null)
+                },
+                onSelected = {
+                    settingsViewModel.iptvProvinceFilterEnable =
+                        !settingsViewModel.iptvProvinceFilterEnable
+                },
+            )
+        }
+
+        if (settingsViewModel.iptvProvinceFilterEnable) {
+            item {
+                val popupManager = LocalPopupManager.current
+                var visible by remember { mutableStateOf(false) }
+
+                SettingsListItem(
+                    headlineContent = "当前省份",
+                    supportingContent = "过滤后仅保留该省份相关的频道分组，默认根据IP自动解析",
+                    trailingContent = if (settingsViewModel.iptvProvinceCurrent.isBlank()) "全部"
+                    else settingsViewModel.iptvProvinceCurrent,
+                    onSelected = {
+                        popupManager.push(it, true)
+                        visible = true
+                    },
+                )
+
+                SelectDialog(
+                    visibleProvider = { visible },
+                    onDismissRequest = { visible = false },
+                    title = "当前省份",
+                    currentDataProvider = { settingsViewModel.iptvProvinceCurrent },
+                    dataListProvider = { listOf("") + Provinces.ALL },
+                    dataText = { if (it.isBlank()) "全部" else it },
+                    onDataSelected = {
+                        settingsViewModel.iptvProvinceCurrent = it
+                        visible = false
+                    },
                 )
             }
         }

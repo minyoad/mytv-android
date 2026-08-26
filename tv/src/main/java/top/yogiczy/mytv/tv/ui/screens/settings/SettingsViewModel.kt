@@ -19,8 +19,6 @@ import top.yogiczy.mytv.core.data.entities.epgsource.EpgSource
 import top.yogiczy.mytv.core.data.entities.epgsource.EpgSourceList
 import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSource
 import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSourceList
-import top.yogiczy.mytv.core.data.repositories.epg.EpgRepository
-import top.yogiczy.mytv.core.data.repositories.iptv.IptvRepository
 import top.yogiczy.mytv.core.data.utils.Globals
 import top.yogiczy.mytv.tv.ui.material.Snackbar
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.VideoPlayerDisplayMode
@@ -164,6 +162,22 @@ class SettingsViewModel : ViewModel() {
         get() = _iptvChannelGroupHiddenList
         set(value) {
             Configs.iptvChannelGroupHiddenList = value
+        }
+
+    private var _iptvProvinceFilterEnable by mutableStateOf(Configs.iptvProvinceFilterEnable)
+    var iptvProvinceFilterEnable: Boolean
+        get() = _iptvProvinceFilterEnable
+        set(value) {
+            _iptvProvinceFilterEnable = value
+            Configs.iptvProvinceFilterEnable = value
+        }
+
+    private var _iptvProvinceCurrent by mutableStateOf(Configs.iptvProvinceCurrent)
+    var iptvProvinceCurrent: String
+        get() = _iptvProvinceCurrent
+        set(value) {
+            _iptvProvinceCurrent = value
+            Configs.iptvProvinceCurrent = value
         }
 
     private var _iptvHybridMode by mutableStateOf(Configs.iptvHybridMode)
@@ -413,6 +427,8 @@ class SettingsViewModel : ViewModel() {
                     Configs.KEY.IPTV_CHANNEL_FAVORITE_LIST -> _iptvChannelFavoriteList = Configs.iptvChannelFavoriteList
                     Configs.KEY.IPTV_CHANNEL_FAVORITE_CHANGE_BOUNDARY_JUMP_OUT -> _iptvChannelFavoriteChangeBoundaryJumpOut = Configs.iptvChannelFavoriteChangeBoundaryJumpOut
                     Configs.KEY.IPTV_CHANNEL_GROUP_HIDDEN_LIST -> _iptvChannelGroupHiddenList = Configs.iptvChannelGroupHiddenList
+                    Configs.KEY.IPTV_PROVINCE_FILTER_ENABLE -> _iptvProvinceFilterEnable = Configs.iptvProvinceFilterEnable
+                    Configs.KEY.IPTV_PROVINCE_CURRENT -> _iptvProvinceCurrent = Configs.iptvProvinceCurrent
                     Configs.KEY.IPTV_HYBRID_MODE -> _iptvHybridMode = Configs.iptvHybridMode
                     Configs.KEY.IPTV_AUTO_PROBE -> _iptvAutoProbe = Configs.iptvAutoProbe
                     Configs.KEY.IPTV_AUTO_PROBE_DAILY_LIMIT -> _iptvAutoProbeDailyLimit = Configs.iptvAutoProbeDailyLimit

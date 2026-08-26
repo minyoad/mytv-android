@@ -35,13 +35,17 @@ fun ChannelItemLogo(
     val logo = logoProvider()
     val textFallback = textFallbackProvider()
 
+    // 当前加载的 logo URL，加载失败时支持 png/webp 格式间自动回退
+    var currentLogo by remember(logo) { mutableStateOf(logo) }
+    var formatFallbackTried by remember(logo) { mutableStateOf(false) }
+
     Box(
         modifier = modifier
             .fillMaxHeight()
             .aspectRatio(1f),
         contentAlignment = Alignment.Center
     ) {
-        if (logo.isNullOrBlank()) {
+        if (currentLogo.isNullOrBlank()) {
             if (!textFallback.isNullOrBlank()) {
                 ChannelItemLogoFallback(
                     modifier = Modifier.fillMaxSize(),
@@ -52,7 +56,7 @@ fun ChannelItemLogo(
             SubcomposeAsyncImage(
                 modifier = Modifier.fillMaxSize(),
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(logo)
+                    .data(currentLogo)
                     .allowHardware(false)
                     .bitmapConfig(Bitmap.Config.ARGB_8888)
                     .build(),
@@ -66,16 +70,35 @@ fun ChannelItemLogo(
                     }
                 },
                 error = {
-                    log.e("加载Logo失败: $logo, 原因: ${it.result.throwable.message}")
-                    if (!textFallback.isNullOrBlank()) {
-                        ChannelItemLogoFallback(
-                            modifier = Modifier.fillMaxSize(),
-                            text = textFallback,
-                        )
+                    val fallbackLogo = if (!formatFallbackTried) swapImageExtension(currentLogo) else null
+                    if (fallbackLogo != null) {
+                        formatFallbackTried = true
+                        currentLogo = fallbackLogo
+                        log.d("Logo加载失败，尝试备用格式: $currentLogo -> $fallbackLogo")
+                    } else {
+                        log.e("加载Logo失败: $currentLogo, 原因: ${it.result.throwable.message}")
+                        if (!textFallback.isNullOrBlank()) {
+                            ChannelItemLogoFallback(
+                                modifier = Modifier.fillMaxSize(),
+                                text = textFallback,
+                            )
+                        }
                     }
                 }
             )
         }
+    }
+}
+
+/**
+ * png/webp 扩展名互换，用于 logo 加载失败时尝试备用格式
+ */
+private fun swapImageExtension(url: String?): String? {
+    if (url.isNullOrBlank()) return null
+    return when {
+        url.endsWith(".png", ignoreCase = true) -> url.dropLast(4) + ".webp"
+        url.endsWith(".webp", ignoreCase = true) -> url.dropLast(5) + ".png"
+        else -> null
     }
 }
 

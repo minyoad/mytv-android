@@ -84,6 +84,12 @@ object Configs {
         /** 直播源分组隐藏列表 */
         IPTV_CHANNEL_GROUP_HIDDEN_LIST,
 
+        /** 省份过滤 */
+        IPTV_PROVINCE_FILTER_ENABLE,
+
+        /** 当前省份 */
+        IPTV_PROVINCE_CURRENT,
+
         /** 混合模式 */
         IPTV_HYBRID_MODE,
 
@@ -354,6 +360,22 @@ object Configs {
         set(value) {
             SP.putStringSet(KEY.IPTV_CHANNEL_GROUP_HIDDEN_LIST.name, value)
             notifyChange(KEY.IPTV_CHANNEL_GROUP_HIDDEN_LIST)
+        }
+
+    /** 省份过滤 */
+    var iptvProvinceFilterEnable: Boolean
+        get() = SP.getBoolean(KEY.IPTV_PROVINCE_FILTER_ENABLE.name, true)
+        set(value) {
+            SP.putBoolean(KEY.IPTV_PROVINCE_FILTER_ENABLE.name, value)
+            notifyChange(KEY.IPTV_PROVINCE_FILTER_ENABLE)
+        }
+
+    /** 当前省份 */
+    var iptvProvinceCurrent: String
+        get() = SP.getString(KEY.IPTV_PROVINCE_CURRENT.name, "")
+        set(value) {
+            SP.putString(KEY.IPTV_PROVINCE_CURRENT.name, value)
+            notifyChange(KEY.IPTV_PROVINCE_CURRENT)
         }
 
     /** 混合模式 */
