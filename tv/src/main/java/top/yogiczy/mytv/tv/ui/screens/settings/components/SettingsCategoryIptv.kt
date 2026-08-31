@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Switch
 import androidx.tv.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.launch
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
@@ -120,6 +122,31 @@ fun SettingsCategoryIptv(
                     visible = false
                 },
             )
+        }
+
+        item {
+            val popupManager = LocalPopupManager.current
+            val focusRequester = remember { FocusRequester() }
+            var showLanSettings by remember { mutableStateOf(false) }
+
+            SettingsListItem(
+                modifier = Modifier.focusRequester(focusRequester),
+                headlineContent = "添加自定义直播源",
+                supportingContent = "使用手机或电脑通过局域网推送 M3U/TXT 直播源",
+                trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+                onSelected = {
+                    popupManager.push(focusRequester, true)
+                    showLanSettings = true
+                },
+                remoteConfig = true,
+            )
+
+            SimplePopup(
+                visibleProvider = { showLanSettings },
+                onDismissRequest = { showLanSettings = false },
+            ) {
+                SettingsCategoryPush()
+            }
         }
 
         item {

@@ -33,8 +33,9 @@ fun SettingsCategoryPush(
                 textProvider = { serverUrl },
             )
 
-            Text("服务已启动：${serverUrl}")
-            Text("请扫描二维码或输入IP地址进行连接")
+            Text("局域网设置地址：${serverUrl}")
+            Text("请使用同一局域网内的手机或电脑扫码访问")
+            Text("打开后可添加 M3U/TXT 直播源和 XML/XML.GZ 节目单")
         }
     }
 }
