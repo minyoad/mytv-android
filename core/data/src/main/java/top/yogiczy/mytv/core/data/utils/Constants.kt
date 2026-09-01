@@ -92,7 +92,7 @@ object Constants {
     /**
      * 频道logo来源
      */
-    const val CHANNEL_LOGO_SOURCE="https://iptv-cdn.mybacc.com/logo/"
+    const val CHANNEL_LOGO_SOURCE = "https://iptv-cdn.mybacc.com/logo/"
 
     /**
      * 节目单刷新时间阈值（小时）
