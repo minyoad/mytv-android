@@ -97,7 +97,8 @@ class IJKVideoPlayer(
         override fun onPrepared(mp: IMediaPlayer?) {
             triggerPrepared()
             triggerReady()
-            
+            updateMetadata()
+
             updatePositionJob?.cancel()
             updatePositionJob = coroutineScope.launch {
                 while (true) {
@@ -112,7 +113,11 @@ class IJKVideoPlayer(
             when (what) {
                 IMediaPlayer.MEDIA_INFO_BUFFERING_START -> triggerBuffering(true)
                 IMediaPlayer.MEDIA_INFO_BUFFERING_END -> triggerBuffering(false)
-                IMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START -> triggerIsPlayingChanged(true)
+                IMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START -> {
+                    triggerIsPlayingChanged(true)
+                    // 首帧渲染后解码器已初始化，此时能拿到完整的解码器信息
+                    updateMetadata()
+                }
             }
             return true
         }
@@ -140,11 +145,86 @@ class IJKVideoPlayer(
             sarDen: Int
         ) {
             triggerResolution(width, height)
+            updateMetadata()
         }
         
         override fun onCompletion(mp: IMediaPlayer?) {
             triggerIsPlayingChanged(false)
         }
+    }
+
+    /**
+     * 从 IJK 底层读取流信息(编码/分辨率/帧率/码率/音频参数)与解码器信息，刷新 metadata。
+     * 需在 onPrepared / 尺寸变化 / 首帧渲染后调用。
+     */
+    private fun updateMetadata() {
+        try {
+            val mediaInfo = ijkPlayer.getMediaInfo() ?: return
+            val mediaMeta = mediaInfo.mMeta
+            val videoStream = mediaMeta?.mVideoStream
+            val audioStream = mediaMeta?.mAudioStream
+
+            val fpsNum = videoStream?.mFpsNum ?: 0
+            val fpsDen = videoStream?.mFpsDen ?: 0
+            val streamBitrate = videoStream?.mBitrate ?: 0L
+            val formatBitrate = mediaMeta?.mBitrate ?: 0L
+            val streamWidth = videoStream?.mWidth ?: 0
+            val streamHeight = videoStream?.mHeight ?: 0
+            val channelLayout = audioStream?.mChannelLayout ?: 0L
+
+            metadata = metadata.copy(
+                videoMimeType = videoStream?.mCodecName.toMimeType(isVideo = true),
+                videoWidth = if (streamWidth > 0) streamWidth else ijkPlayer.videoWidth,
+                videoHeight = if (streamHeight > 0) streamHeight else ijkPlayer.videoHeight,
+                // IJK 不提供如 Media3 colorInfo 那样的色彩空间描述，保持为空
+                videoColor = "",
+                videoFrameRate = if (fpsNum > 0 && fpsDen > 0) fpsNum.toFloat() / fpsDen else 0f,
+                videoBitrate = (if (streamBitrate > 0) streamBitrate else formatBitrate).toInt(),
+                videoDecoder = mediaInfo.mVideoDecoder.orEmpty(),
+
+                audioMimeType = audioStream?.mCodecName.toMimeType(isVideo = false),
+                audioChannels = if (channelLayout > 0) java.lang.Long.bitCount(channelLayout) else 0,
+                audioSampleRate = audioStream?.mSampleRate ?: 0,
+                audioDecoder = mediaInfo.mAudioDecoder.orEmpty(),
+            )
+            triggerMetadata(metadata)
+        } catch (e: Exception) {
+            log.e("updateMetadata error", e)
+        }
+    }
+
+    /**
+     * 将 FFmpeg 的 codec_name 映射为与 Media3 一致风格的 MIME 类型展示
+     */
+    private fun String?.toMimeType(isVideo: Boolean): String {
+        if (isNullOrEmpty()) return ""
+        val videoMap = mapOf(
+            "h264" to "video/avc",
+            "hevc" to "video/hevc",
+            "mpeg2video" to "video/mpeg2",
+            "mpeg4" to "video/mp4v-es",
+            "vp8" to "video/x-vnd.on2.vp8",
+            "vp9" to "video/x-vnd.on2.vp9",
+            "av1" to "video/av01",
+            "mjpeg" to "video/jpeg",
+        )
+        val audioMap = mapOf(
+            "aac" to "audio/mp4a-latm",
+            "aac_latm" to "audio/mp4a-latm",
+            "mp3" to "audio/mpeg",
+            "ac3" to "audio/ac3",
+            "eac3" to "audio/eac3",
+            "dts" to "audio/vnd.dts",
+            "opus" to "audio/opus",
+            "vorbis" to "audio/vorbis",
+            "flac" to "audio/flac",
+            "pcm_mulaw" to "audio/g711-mulaw",
+            "pcm_alaw" to "audio/g711-alaw",
+        )
+        return (if (isVideo) videoMap else audioMap)[this]
+            ?: if (isVideo) "video/$this"
+            else if (startsWith("pcm_")) "audio/raw"
+            else "audio/$this"
     }
 
     override fun initialize() {
