@@ -82,7 +82,12 @@ class Media3VideoPlayer(
             }
 
             C.CONTENT_TYPE_RTSP -> {
-                RtspMediaSource.Factory().setDebugLoggingEnabled(true).createMediaSource(mediaItem)
+                // RTSP 源默认尝试 UDP，收不到 RTP 数据需等 DEFAULT_TIMEOUT_MS=5s 才回退 TCP，
+                // 公网/NAT 场景下会明显拖慢出图（对齐 IJK 的 rtsp_transport=tcp，直接走 TCP）
+                RtspMediaSource.Factory()
+                    .setForceUseRtpTcp(true)
+                    .setDebugLoggingEnabled(true)
+                    .createMediaSource(mediaItem)
             }
 
             C.CONTENT_TYPE_OTHER -> {

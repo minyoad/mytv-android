@@ -1,18 +1,41 @@
-import com.android.build.gradle.internal.dsl.BaseAppModuleExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.FileInputStream
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose)
     alias(libs.plugins.kotlin.serialization)
 }
 
-android {
-    @Suppress("UNCHECKED_CAST")
-    apply(extra["appConfig"] as BaseAppModuleExtension.() -> Unit)
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
 
+android {
     namespace = "top.yogiczy.mytv.tv"
     compileSdk = libs.versions.compileSdk.get().toInt()
+
+    signingConfigs {
+        create("release") {
+            val localKeystore = rootProject.file("keystore.jks")
+            val userKeystore = file(
+                System.getenv("RELEASE_STORE_FILE")
+                    ?: keystoreProperties.getProperty("storeFile")
+                    ?: "keystore.jks"
+            )
+
+            storeFile = if (userKeystore.exists()) userKeystore else localKeystore
+            storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+                ?: keystoreProperties.getProperty("storePassword")
+            keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                ?: keystoreProperties.getProperty("keyAlias")
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+                ?: keystoreProperties.getProperty("keyPassword")
+        }
+    }
 
     defaultConfig {
         applicationId = "top.yogiczy.mytv.tv"
@@ -47,8 +70,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_1_8
     }
 
-    kotlinOptions {
-        jvmTarget = "1.8"
+    // AGP 9 built-in Kotlin
+    //noinspection WrongGradleMethod
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_1_8)
+        }
     }
 
     buildFeatures {
@@ -89,9 +116,9 @@ dependencies {
     // 播放器
     val mediaSettingsFile = file("../../media/core_settings.gradle")
     if (mediaSettingsFile.exists()) {
-        implementation(project(":media3:lib-exoplayer"))
-        implementation(project(":media3:lib-exoplayer-hls"))
-        implementation(project(":media3:lib-exoplayer-rtsp"))
+        implementation(project(":lib-exoplayer"))
+        implementation(project(":lib-exoplayer-hls"))
+        implementation(project(":lib-exoplayer-rtsp"))
     } else {
         implementation(libs.androidx.media3.exoplayer)
         implementation(libs.androidx.media3.exoplayer.hls)
