@@ -113,17 +113,25 @@ dependencies {
     implementation(libs.kotlinx.collections.immutable)
     implementation(libs.androidx.material.icons.extended)
 
-    // 播放器
-    val mediaSettingsFile = file("../../media/core_settings.gradle")
-    if (mediaSettingsFile.exists()) {
-        implementation(project(":lib-exoplayer"))
-        implementation(project(":lib-exoplayer-hls"))
-        implementation(project(":lib-exoplayer-rtsp"))
-    } else {
-        implementation(libs.androidx.media3.exoplayer)
-        implementation(libs.androidx.media3.exoplayer.hls)
-        implementation(libs.androidx.media3.exoplayer.rtsp)
+    // 播放器：media3 由本地 fork 仓库导出为预编译 AAR（tv/libs/media3-*.aar），
+    // 经下方 fileTree("libs") 统一引入；工程不再依赖外部源码或 Maven 坐标。
+    // AAR 无 POM，以下为其缺省的传递运行时依赖，需宿主显式声明：
+    //  - lib-common api 依赖 Guava（EventLogger 等运行时用到 Joiner/Optional），
+    //    exclude 与 media 仓库 libraries/common/build.gradle 保持一致
+    implementation("com.google.guava:guava:33.3.1-android") {
+        // 与 media 仓库 libraries/common/build.gradle 的 exclude 保持一致：
+        // 排除 Guava 仅编译期使用、却声明为 runtime 的注解依赖
+        exclude(group = "com.google.code.findbugs", module = "jsr305")
+        exclude(group = "org.checkerframework", module = "checker-compat-qual")
+        exclude(group = "org.checkerframework", module = "checker-qual")
+        exclude(group = "com.google.errorprone", module = "error_prone_annotations")
+        exclude(group = "com.google.j2objc", module = "j2objc-annotations")
+        exclude(group = "org.codehaus.mojo", module = "animal-sniffer-annotations")
     }
+    //  - lib-extractor 的文本编码探测依赖
+    implementation("com.googlecode.juniversalchardet:juniversalchardet:1.0.3")
+    //  - lib-datasource-rtmp 依赖的 LibRtmp Client（RTMP 源播放）
+    implementation("io.antmedia:rtmp-client:3.2.0")
 
     // 二维码
     implementation(libs.qrose)

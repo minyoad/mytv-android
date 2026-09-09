@@ -62,6 +62,11 @@
 -keep class tv.danmaku.ijk.media.player.** { *; }
 -keep interface tv.danmaku.ijk.media.player.** { *; }
 
+# media3 RTMP 扩展：DefaultDataSource 通过反射 Class.forName 发现，
+# R8 会裁剪掉未被静态引用的类，需显式保留（含构造器供反射实例化）
+-keep class androidx.media3.datasource.rtmp.RtmpDataSource { *; }
+-keep class io.antmedia.rtmp_client.** { *; }
+
 -keep class com.aliyun.rts.network.** { *; }
 -keep class com.wangsu.httpclient.** { *; }
 
