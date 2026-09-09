@@ -10,16 +10,43 @@ on:
         description: 'Tag to release (e.g. v1.2.3)'
         required: true
 
+# ===== media3 源码集成 =====
+# 本地构建使用外部目录的 media3 源码。为让 CI 与本地产物一致，
+# 需把同一个 media3 仓库 @ 固定 commit 拉到 workspace/media（宿主在 app/ 下，
+# file("../media/...") 即可命中），而不是回落 Maven 坐标。
+#
+# media3 源码仓库 = 自己的 fork @ 固定 commit（与本地 media 仓库一致，勿随意改动）。
+# fork: https://github.com/minyoad/media  branch: release
+# 更新方式：本地 media 仓库推送 release 后，把下方 REF 换成新的 commit sha。
+env:
+  MEDIA3_REPOSITORY: 'minyoad/media'
+  MEDIA3_REF: '37c0c6168694423b6177ccd6e16980d0d6f20549'
+
 jobs:
   build_apk:
     runs-on: ubuntu-latest
+    # 主仓库检出在 app/ 子目录，所有命令默认在此执行；media3 与其同级位于 media/
+    defaults:
+      run:
+        working-directory: app
     steps:
-      # 1. 检出源码
+      # 1. 检出主仓库到 app/（sibling 布局核心：app/ 与 media/ 同级）
       - name: Checkout source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
+          path: app
           fetch-depth: 0 # 获取完整历史，确保能找到所有 tag
 
+      # 2. 检出 media3 源码到 media/（自己的 fork @ 固定 commit，与本地一致）
+      - name: Checkout media3 source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.MEDIA3_REPOSITORY }}
+          ref: ${{ env.MEDIA3_REF }}
+          path: media
+          fetch-depth: 1
+
+      # 3. 切换到指定 TAG
       - name: Checkout tag
         run: |
           # 确定目标 TAG
@@ -28,58 +55,60 @@ jobs:
           else
             TAG="${{ github.ref_name }}"
           fi
-          
+
           echo "Target TAG: $TAG"
-          
+
           # 切换到指定 TAG
           git fetch --tags --force
           git checkout "$TAG"
-          
+
           echo "TAG=$TAG" >> $GITHUB_ENV
 
-      # 2. 配置 JDK
+      # 4. 配置 JDK（21，与本地一致）
       - name: Set up JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
-      # 3. 赋予 Gradle 可执行权限
+      # 5. 赋予 Gradle 可执行权限
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      # 4. 导入签名密钥
+      # 6. 导入签名密钥
       - name: Decode signing key
         run: |
           echo "${{ secrets.SIGNING_KEYSTORE_B64 }}" | base64 -d > release.keystore
-          echo "RELEASE_STORE_FILE=${{ github.workspace }}/release.keystore" >> $GITHUB_ENV
+          echo "RELEASE_STORE_FILE=${{ github.workspace }}/app/release.keystore" >> $GITHUB_ENV
           echo "RELEASE_KEY_ALIAS=${{ secrets.SIGNING_ALIAS }}" >> $GITHUB_ENV
           echo "RELEASE_STORE_PASSWORD=${{ secrets.SIGNING_STORE_PWD }}" >> $GITHUB_ENV
           echo "RELEASE_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PWD }}" >> $GITHUB_ENV
 
-      # 5. 编译 Release APK
+      # 7. 编译 Release APK
       - name: Build Release APK
-        run: ./gradlew assembleRelease --info
+        run: ./gradlew assembleRelease
 
-      # 6. 验证 APK 签名
+      # 8. 验证 APK 签名（自动选用 Runner 上最新的 build-tools）
       - name: Check APK signature
         run: |
-          find tv/build/outputs/apk/release -name 'mytv-android-tv-*.apk' | while read apk; do
+          apksigner="$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner -type f | sort -V | tail -n1)"
+          echo "Using apksigner: $apksigner"
+          find tv/build/outputs/apk/release -name '*.apk' | while read apk; do
             echo "🔍  Checking $apk"
-            "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner" verify --verbose "$apk"
+            "$apksigner" verify --verbose "$apk"
             if [ $? -ne 0 ]; then exit 1; fi
           done
 
-      # 7. 定位 APK 文件
+      # 9. 定位 APK 文件
       - name: Locate APK
         id: apk
         run: |
-          apk_path=$(find tv/build/outputs/apk/release -name 'mytv-android-tv-*.apk' | head -n1)
+          apk_path=$(find tv/build/outputs/apk/release -name '*.apk' | head -n1)
           [ -z "$apk_path" ] && { echo "❌ APK not found"; exit 1; }
           echo "Found APK: $apk_path"
           echo "apk_path=$apk_path" >> $GITHUB_OUTPUT
 
-      # 8. 检测是否为 Beta 版本
+      # 10. 检测是否为 Beta 版本
       - name: Check if Beta
         id: check_beta
         run: |
@@ -90,7 +119,7 @@ jobs:
             echo "is_beta=false" >> $GITHUB_OUTPUT
           fi
 
-      # 9. 发布到 GitHub Release (自动创建或更新)
+      # 11. 发布到 GitHub Release (自动创建或更新)
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
@@ -103,6 +132,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # 12. 触发更新 JSON 工作流
       - name: Trigger Update JSON Workflow
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
