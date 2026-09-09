@@ -3,6 +3,22 @@
 # 遇到错误立即停止
 set -e
 
+# 解析参数：-y 跳过所有交互确认；位置参数为版本号
+YES=0
+NEW_NAME=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -y|--yes)
+            YES=1
+            shift
+            ;;
+        *)
+            NEW_NAME="$1"
+            shift
+            ;;
+    esac
+done
+
 # 配置文件路径
 GRADLE_FILE="tv/build.gradle.kts"
 
@@ -32,9 +48,12 @@ echo "📦 当前版本: $CURRENT_NAME (Code: $CURRENT_CODE)"
 echo "🚀 下个版本 Code 将自动升级为: $NEW_CODE"
 echo "========================================"
 
-# 如果脚本带参数运行 (./release.sh 2.3.5)，则直接使用参数
-if [ -n "$1" ]; then
-    NEW_NAME="$1"
+# 如果脚本带版本号参数运行 (./release.sh 2.3.5)，则直接使用参数
+if [ -n "$NEW_NAME" ]; then
+    :
+elif [ "$YES" -eq 1 ]; then
+    # -y 且未指定版本号：保持当前版本号
+    NEW_NAME="$CURRENT_NAME"
 else
     read -p "请输入新版本名称 (直接回车保持 $CURRENT_NAME): " INPUT_NAME
     # 如果输入为空，则使用当前名称
@@ -47,11 +66,13 @@ echo "   Version Name: $CURRENT_NAME -> $NEW_NAME"
 echo "   Version Code: $CURRENT_CODE -> $NEW_CODE"
 echo ""
 
-read -p "确认继续吗? (y/n) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "已取消。"
-    exit 1
+if [ "$YES" -eq 0 ]; then
+    read -p "确认继续吗? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "已取消。"
+        exit 1
+    fi
 fi
 
 # 5. 修改 Gradle 文件
@@ -75,9 +96,17 @@ git commit -m "chore(release): bump version to $NEW_NAME (code $NEW_CODE)"
 
 # 处理 Tag 重复的情况 (如果是同一个版本号重新发布)
 if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-    read -p "⚠️ Tag $TAG_NAME 已存在。是否覆盖? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    OVERWRITE_TAG=0
+    if [ "$YES" -eq 1 ]; then
+        OVERWRITE_TAG=1
+    else
+        read -p "⚠️ Tag $TAG_NAME 已存在。是否覆盖? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            OVERWRITE_TAG=1
+        fi
+    fi
+    if [ "$OVERWRITE_TAG" -eq 1 ]; then
         git tag -d "$TAG_NAME"
         git push origin :refs/tags/"$TAG_NAME"
     else
@@ -90,14 +119,25 @@ git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
 
 echo "✅ 本地操作完成。"
 
-# 7. 推送
-read -p "是否立即推送到 GitHub 触发编译? (y/n) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "正在推送到 GitHub..."
-    git push origin main
+# 7. 推送（推送到当前分支，而非硬编码 main）
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+DO_PUSH=0
+if [ "$YES" -eq 1 ]; then
+    DO_PUSH=1
+else
+    read -p "是否立即推送到 GitHub 触发编译? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        DO_PUSH=1
+    fi
+fi
+
+if [ "$DO_PUSH" -eq 1 ]; then
+    echo "正在推送到 GitHub (分支: $CURRENT_BRANCH)..."
+    git push origin "$CURRENT_BRANCH"
     git push origin "$TAG_NAME"
     echo "🚀 推送成功！GitHub Action 应该已经开始构建。"
 else
-    echo "请稍后手动执行: git push origin main && git push origin $TAG_NAME"
+    echo "请稍后手动执行: git push origin $CURRENT_BRANCH && git push origin $TAG_NAME"
 fi
