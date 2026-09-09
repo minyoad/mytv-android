@@ -4,6 +4,7 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -70,14 +71,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_1_8
     }
 
-    // AGP 9 built-in Kotlin
-    //noinspection WrongGradleMethod
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_1_8)
-        }
-    }
-
     buildFeatures {
         compose = true
     }
@@ -96,6 +89,12 @@ android {
 //            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
 //        }
 //    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_1_8)
+    }
 }
 
 dependencies {

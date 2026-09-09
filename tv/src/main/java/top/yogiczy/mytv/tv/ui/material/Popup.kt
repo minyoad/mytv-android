@@ -31,16 +31,21 @@ class PopupManager {
 
     fun pop() {
         if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex)
-        val last = stack.lastOrNull()
-        try {
-            last?.focusRequester?.requestFocus()
-            if (last?.emitter == true) stack.remove(last)
-        } catch (ex: Exception) {
-            ex.printStackTrace()
+
+        // 尽力将焦点返还给“仍处于组合中”的下方条目。
+        // pop() 由 popupable() 的 onDispose 在组合销毁阶段调用；当整个子树（整屏退出、
+        // Activity 销毁等）一并卸载时，下方条目的 FocusRequester 早已脱离组合，
+        // requestFocus() 会抛 IllegalStateException("FocusRequester is not initialized")，
+        // 此时该条目已无意义：静默移除并继续向上查找，无需转移焦点，也不能把异常打出日志。
+        var last = stack.lastOrNull()
+        while (last != null) {
             try {
-                stack.remove(last)
-                stack.lastOrNull()?.focusRequester?.requestFocus()
+                last.focusRequester.requestFocus()
+                if (last.emitter) stack.remove(last)
+                return
             } catch (_: Exception) {
+                stack.remove(last)
+                last = stack.lastOrNull()
             }
         }
     }
