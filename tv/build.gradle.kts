@@ -65,6 +65,18 @@ android {
         }
     }
 
+    // 自定义 APK 输出文件名（AGP 8）：
+    // mytv-android-tv-<versionName>-all-sdk<minSdk>.apk
+    // 例：mytv-android-tv-2.6.0-beta-all-sdk23.apk
+    applicationVariants.all {
+        val versionName = versionName ?: "unknown"
+        val minSdk = defaultConfig.minSdk ?: 0
+        outputs.all {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
+                .outputFileName = "mytv-android-tv-${versionName}-all-sdk${minSdk}.apk"
+        }
+    }
+
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_1_8
