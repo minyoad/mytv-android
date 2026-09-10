@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,9 +25,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Switch
 import androidx.tv.material3.Text
+import kotlinx.coroutines.launch
 import top.yogiczy.mytv.core.data.utils.Constants
 import top.yogiczy.mytv.tv.ui.material.LocalPopupManager
 import top.yogiczy.mytv.tv.ui.material.SimplePopup
+import top.yogiczy.mytv.tv.ui.material.Snackbar
+import top.yogiczy.mytv.tv.ui.material.SnackbarType
 import top.yogiczy.mytv.tv.ui.screens.components.Qrcode
 import top.yogiczy.mytv.tv.ui.screens.guide.GuideScreen
 import top.yogiczy.mytv.tv.ui.screens.settings.SettingsViewModel
@@ -39,6 +43,8 @@ fun SettingsCategoryAbout(
     updateViewModel: UpdateViewModel = viewModel(),
     packageInfo: PackageInfo = rememberPackageInfo(),
 ) {
+    val coroutineScope = rememberCoroutineScope()
+
     SettingsContentList(modifier) {
         item {
             SettingsListItem(
@@ -79,10 +85,44 @@ fun SettingsCategoryAbout(
 
             SettingsListItem(
                 headlineContent = "更新通道",
+                supportingContent = "切换后立即检查远端版本",
                 trailingContent = list[settingsViewModel.updateChannel] ?: "",
                 onSelected = {
-                    settingsViewModel.updateChannel =
-                        list.keys.first { it != settingsViewModel.updateChannel }
+                    val newChannel = list.keys.first { it != settingsViewModel.updateChannel }
+                    settingsViewModel.updateChannel = newChannel
+
+                    coroutineScope.launch {
+                        Snackbar.show(
+                            "正在检查${list[newChannel]}版本...",
+                            leadingLoading = true,
+                            duration = 5_000,
+                            id = "checkUpdate",
+                        )
+
+                        val success = updateViewModel.checkUpdate(
+                            currentVersion = packageInfo.versionName ?: "0.0.0",
+                            channel = newChannel,
+                            force = true,
+                        )
+
+                        when {
+                            !success -> Snackbar.show(
+                                "检查更新失败，请稍后重试",
+                                type = SnackbarType.ERROR,
+                                id = "checkUpdate",
+                            )
+
+                            updateViewModel.isUpdateAvailable -> Snackbar.show(
+                                "发现新版本：v${updateViewModel.latestRelease.version}",
+                                id = "checkUpdate",
+                            )
+
+                            else -> Snackbar.show(
+                                "当前已是最新版本",
+                                id = "checkUpdate",
+                            )
+                        }
+                    }
                 },
             )
         }
