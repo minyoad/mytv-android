@@ -21,16 +21,22 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.tv.material3.Switch
 import androidx.tv.material3.Text
 import top.yogiczy.mytv.core.data.utils.Constants
 import top.yogiczy.mytv.tv.ui.material.LocalPopupManager
 import top.yogiczy.mytv.tv.ui.material.SimplePopup
 import top.yogiczy.mytv.tv.ui.screens.components.Qrcode
 import top.yogiczy.mytv.tv.ui.screens.guide.GuideScreen
+import top.yogiczy.mytv.tv.ui.screens.settings.SettingsViewModel
+import top.yogiczy.mytv.tv.ui.screens.update.UpdateViewModel
 
 @Composable
 fun SettingsCategoryAbout(
     modifier: Modifier = Modifier,
+    settingsViewModel: SettingsViewModel = viewModel(),
+    updateViewModel: UpdateViewModel = viewModel(),
     packageInfo: PackageInfo = rememberPackageInfo(),
 ) {
     SettingsContentList(modifier) {
@@ -46,6 +52,52 @@ fun SettingsCategoryAbout(
             SettingsListItem(
                 headlineContent = "应用版本",
                 trailingContent = packageInfo.versionName ?: "",
+            )
+        }
+
+        item {
+            val popupManager = LocalPopupManager.current
+            val focusRequester = remember { FocusRequester() }
+
+            SettingsListItem(
+                modifier = Modifier.focusRequester(focusRequester),
+                headlineContent = "应用更新",
+                supportingContent = "最新版本：v${updateViewModel.latestRelease.version}",
+                trailingContent = if (updateViewModel.isUpdateAvailable) "发现新版本" else "无更新",
+                onSelected = {
+                    popupManager.push(focusRequester, true)
+                    updateViewModel.visible = true
+                },
+            )
+        }
+
+        item {
+            val list = mapOf(
+                "stable" to "稳定版",
+                "beta" to "测试版",
+            )
+
+            SettingsListItem(
+                headlineContent = "更新通道",
+                trailingContent = list[settingsViewModel.updateChannel] ?: "",
+                onSelected = {
+                    settingsViewModel.updateChannel =
+                        list.keys.first { it != settingsViewModel.updateChannel }
+                },
+            )
+        }
+
+        item {
+            SettingsListItem(
+                headlineContent = "更新强提醒",
+                supportingContent = if (settingsViewModel.updateForceRemind) "检测到新版本时会全屏提醒"
+                else "检测到新版本时仅消息提示",
+                trailingContent = {
+                    Switch(settingsViewModel.updateForceRemind, null)
+                },
+                onSelected = {
+                    settingsViewModel.updateForceRemind = !settingsViewModel.updateForceRemind
+                },
             )
         }
 
@@ -110,37 +162,6 @@ fun SettingsCategoryAbout(
                 GuideScreen(onClose = { isGuideScreenVisible = false })
             }
         }
-
-//        item {
-//            val popupManager = LocalPopupManager.current
-//            val focusRequester = remember { FocusRequester() }
-//            var visible by remember { mutableStateOf(false) }
-//
-//            SettingsListItem(
-//                modifier = Modifier.focusRequester(focusRequester),
-//                headlineContent = "赞赏",
-//                trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
-//                onSelected = {
-//                    popupManager.push(focusRequester, true)
-//                    visible = true
-//                },
-//            )
-//
-//            SimplePopup(
-//                visibleProvider = { visible },
-//                onDismissRequest = { visible = false },
-//            ) {
-//                val painter = painterResource(R.drawable.mm_reward_qrcode)
-//
-//                Image(
-//                    painter,
-//                    contentDescription = null,
-//                    modifier = Modifier
-//                        .align(Alignment.Center)
-//                        .size(300.dp),
-//                )
-//            }
-//        }
     }
 }
 
