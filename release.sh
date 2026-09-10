@@ -29,10 +29,10 @@ if [ ! -f "$GRADLE_FILE" ]; then
 fi
 
 # 2. 提取当前版本信息
-# 使用 sed 提取 versionCode = 后的数字
-CURRENT_CODE=$(grep "versionCode =" "$GRADLE_FILE" | sed -E 's/.*versionCode = ([0-9]+).*/\1/')
-# 使用 sed 提取 versionName = 后的引号内容
-CURRENT_NAME=$(grep "versionName =" "$GRADLE_FILE" | sed -E 's/.*versionName = "([^"]+)".*/\1/')
+# 仅匹配 defaultConfig 中的声明（行首缩进后紧跟 versionCode/versionName），
+# 避免误匹配 applicationVariants 中的局部变量（如 val versionName = ...）
+CURRENT_CODE=$(grep -E '^[[:space:]]*versionCode = [0-9]+' "$GRADLE_FILE" | head -n 1 | sed -E 's/.*versionCode = ([0-9]+).*/\1/')
+CURRENT_NAME=$(grep -E '^[[:space:]]*versionName = "' "$GRADLE_FILE" | head -n 1 | sed -E 's/.*versionName = "([^"]+)".*/\1/')
 
 if [ -z "$CURRENT_CODE" ] || [ -z "$CURRENT_NAME" ]; then
     echo "❌ 错误: 无法从 $GRADLE_FILE 中解析版本信息，请检查文件格式。"
@@ -78,11 +78,11 @@ fi
 # 5. 修改 Gradle 文件
 echo "正在更新 $GRADLE_FILE ..."
 
-# 替换 versionCode (匹配 versionCode = 数字)
-sed -i.bak "s/versionCode = [0-9]*/versionCode = $NEW_CODE/" "$GRADLE_FILE"
+# 替换 versionCode（仅匹配行首缩进后的声明，避免误伤其他代码）
+sed -i.bak -E "s/^([[:space:]]*)versionCode = [0-9]+/\1versionCode = $NEW_CODE/" "$GRADLE_FILE"
 
-# 替换 versionName (匹配 versionName = "任意字符")
-sed -i.bak "s/versionName = \".*\"/versionName = \"$NEW_NAME\"/" "$GRADLE_FILE"
+# 替换 versionName（仅匹配行首缩进后的声明，避免误伤其他代码）
+sed -i.bak -E "s/^([[:space:]]*)versionName = \"[^\"]*\"/\1versionName = \"$NEW_NAME\"/" "$GRADLE_FILE"
 
 # 删除备份文件
 rm "${GRADLE_FILE}.bak"

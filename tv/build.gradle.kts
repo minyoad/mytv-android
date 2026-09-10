@@ -69,11 +69,11 @@ android {
     // mytv-android-tv-<versionName>-all-sdk<minSdk>.apk
     // 例：mytv-android-tv-2.6.0-beta-all-sdk23.apk
     applicationVariants.all {
-        val versionName = versionName ?: "unknown"
+        val variantVersionName = versionName ?: "unknown"
         val minSdk = defaultConfig.minSdk ?: 0
         outputs.all {
             (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
-                .outputFileName = "mytv-android-tv-${versionName}-all-sdk${minSdk}.apk"
+                .outputFileName = "mytv-android-tv-${variantVersionName}-all-sdk${minSdk}.apk"
         }
     }
 
