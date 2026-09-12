@@ -135,7 +135,7 @@ object Constants {
     /**
      * 播放器加载超时
      */
-    const val VIDEO_PLAYER_LOAD_TIMEOUT = 1000L * 15 // 15秒
+    const val VIDEO_PLAYER_LOAD_TIMEOUT = 1000L * 5 // 5秒
 
     /**
      * 日志历史最大保留条数
