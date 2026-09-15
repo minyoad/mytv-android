@@ -656,7 +656,7 @@ object Configs {
 
     /** 播放器类型 */
     var videoPlayerType: VideoPlayerType
-        get() = VideoPlayerType.valueOf(SP.getString(KEY.VIDEO_PLAYER_TYPE.name, VideoPlayerType.IJK.name))
+        get() = VideoPlayerType.valueOf(SP.getString(KEY.VIDEO_PLAYER_TYPE.name, VideoPlayerType.MEDIA3.name))
         set(value) {
             SP.putString(KEY.VIDEO_PLAYER_TYPE.name, value.name)
             notifyChange(KEY.VIDEO_PLAYER_TYPE)

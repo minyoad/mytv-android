@@ -28,3 +28,19 @@ keystore.jks
 app/build/
 .vscode/
 /.artifacts/
+
+# IDE 附加配置文件
+/.idea/AndroidProjectSystem.xml
+/.idea/MarsCodeWorkspaceAppSettings.xml
+/.idea/markdown.xml
+
+# JVM 崩溃日志 (hs_err / replay)
+hs_err_pid*.log
+replay_pid*.log
+
+# 构建诊断临时文件
+.assemble_fail.log
+.dupcheck.log
+.gradle_media3_deps.log
+.gradle_tmp/
+mytv-android.c1baa66c/

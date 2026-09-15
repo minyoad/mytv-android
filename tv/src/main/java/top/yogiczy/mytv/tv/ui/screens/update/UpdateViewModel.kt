@@ -32,20 +32,36 @@ class UpdateViewModel : ViewModel() {
 
     var visible by mutableStateOf(false)
 
-    suspend fun checkUpdate(currentVersion: String, channel: String) {
-        if (_isChecking) return
-        if (_isUpdateAvailable) return
+    /**
+     * 检查更新
+     * @param force 为 true 时忽略已发现的更新并重新拉取（用于切换更新通道后立即刷新）
+     * @return 是否成功获取到远端版本信息
+     */
+    suspend fun checkUpdate(currentVersion: String, channel: String, force: Boolean = false): Boolean {
+        if (_isChecking) return false
+        if (_isUpdateAvailable && !force) return false
 
         try {
-            val releaseUrl = Constants.GIT_RELEASE_LATEST_URL[channel] ?: return
+            val releaseUrl = Constants.GIT_RELEASE_LATEST_URL[channel] ?: return false
 
             _isChecking = true
+
+            if (force) {
+                _isUpdateAvailable = false
+                _updateDownloaded = false
+                _latestRelease = GitRelease()
+            }
+
             _latestRelease = GitRepository().latestRelease(releaseUrl)
             log.d("线上版本: ${_latestRelease.version}")
             _isUpdateAvailable = _latestRelease.version.compareVersion(currentVersion) > 0
+
+            return true
         } catch (ex: Exception) {
             log.e("检查更新失败", ex)
             _latestRelease = _latestRelease.copy(description = ex.message ?: "检查更新失败")
+
+            return false
         } finally {
             _isChecking = false
         }

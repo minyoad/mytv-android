@@ -195,8 +195,12 @@ fun rememberVideoPlayerState(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val state = remember {
+        val initialPlayer = when (Configs.videoPlayerType) {
+            Configs.VideoPlayerType.IJK -> IJKVideoPlayer(context, coroutineScope)
+            Configs.VideoPlayerType.MEDIA3 -> Media3VideoPlayer(context, coroutineScope)
+        }
         VideoPlayerState(
-            IJKVideoPlayer(context, coroutineScope),
+            initialPlayer,
             settingsViewModel,
             context,
             coroutineScope,

@@ -150,10 +150,10 @@ private fun GuideScreenActions(
                 modifier = Modifier
                     .focusOnLaunched(isFirstKey)
                     .handleKeyEvents(onSelect = {
-                        val activeKey = activeKeyProvider()
-                        onChangeActiveKey(
-                            GuideTvRemoteKeys.entries[GuideTvRemoteKeys.entries.indexOf(activeKey) + 1]
-                        )
+                        val index = GuideTvRemoteKeys.entries.indexOf(activeKeyProvider())
+                        if (index in 0 until GuideTvRemoteKeys.entries.lastIndex) {
+                            onChangeActiveKey(GuideTvRemoteKeys.entries[index + 1])
+                        }
                     }),
                 onClick = { },
                 title = { Text("下一步") },
@@ -164,10 +164,10 @@ private fun GuideScreenActions(
             WideButton(
                 modifier = Modifier
                     .handleKeyEvents(onSelect = {
-                        val activeKey = activeKeyProvider()
-                        onChangeActiveKey(
-                            GuideTvRemoteKeys.entries[GuideTvRemoteKeys.entries.indexOf(activeKey) - 1]
-                        )
+                        val index = GuideTvRemoteKeys.entries.indexOf(activeKeyProvider())
+                        if (index > 0) {
+                            onChangeActiveKey(GuideTvRemoteKeys.entries[index - 1])
+                        }
                     }),
                 onClick = { },
                 title = { Text("上一步") },

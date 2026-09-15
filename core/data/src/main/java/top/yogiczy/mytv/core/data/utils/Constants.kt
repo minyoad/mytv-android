@@ -32,6 +32,10 @@ object Constants {
     val IPTV_SOURCE_LIST = IptvSourceList(
         listOf(
             IptvSource(
+                name = "默认直播源-iptvs",
+                url = "https://iptvs.mybacc.com/api/export/m3u",
+            ),
+            IptvSource(
                 name = "默认直播源 my吧",
                 url = "https://tv.mybacc.com/tv/"
             ),
@@ -51,10 +55,6 @@ object Constants {
                 name = "默认直播源-电影列表",
                 url = "https://iptv-cdn.mybacc.com/list/movies.txt",
 //                url = GITHUB_PROXY+"https://raw.githubusercontent.com/minyoad/my-iptv/refs/heads/master/list/movies.txt",
-            ),
-            IptvSource(
-                name = "测试直播源-iptvs",
-                url = "https://iptvs.mybacc.com/api/export/m3u",
             ),
         )
     )
@@ -135,7 +135,7 @@ object Constants {
     /**
      * 播放器加载超时
      */
-    const val VIDEO_PLAYER_LOAD_TIMEOUT = 1000L * 15 // 15秒
+    const val VIDEO_PLAYER_LOAD_TIMEOUT = 1000L * 5 // 5秒
 
     /**
      * 日志历史最大保留条数

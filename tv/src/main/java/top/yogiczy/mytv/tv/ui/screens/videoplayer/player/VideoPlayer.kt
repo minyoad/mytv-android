@@ -76,7 +76,10 @@ abstract class VideoPlayer(
     protected fun triggerError(error: PlaybackException?) {
         onErrorListeners.forEach { it(error) }
 
-        if (error != PlaybackException.LOAD_TIMEOUT) {
+        // 仅在真正上报错误时撤销"加载超时"看门狗：
+        // error 为 null 只表示清除错误提示（回到缓冲态也会走这里），
+        // 若此时撤销看门狗，源不可用时会一直停留在缓冲态，既不报错也不触发超时换源。
+        if (error != null) {
             loadTimeoutJob?.cancel()
             loadTimeoutJob = null
         }
