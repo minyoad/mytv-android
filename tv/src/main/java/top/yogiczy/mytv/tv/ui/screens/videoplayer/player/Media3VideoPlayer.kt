@@ -32,6 +32,10 @@ import java.net.PortUnreachableException
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import javax.net.SocketFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -96,20 +100,61 @@ class Media3VideoPlayer(
      * 目标主机丢包时会一直卡在 TCP 重传（可达数十秒），期间不会回调 onPlayerError，
      * 只能等"加载超时"看门狗兜底才换源。改用 Socket.connect(addr, timeout) 后，
      * 不可用源能在超时后立刻报错，从而尽快切换到下一个源。
+     *
+     * 域名解析与 TCP 连接各自独立计时（与 OkHttp 的 connectTimeout 语义一致），
+     * 因此最坏情况下总耗时为 2 * connectTimeoutMs。
      */
     private class TimeoutSocketFactory(private val connectTimeoutMs: Int) : SocketFactory() {
-        private fun newConnectedSocket(address: InetAddress, port: Int): Socket =
-            Socket().apply { connect(InetSocketAddress(address, port), connectTimeoutMs) }
+        /**
+         * 解析主机名。
+         *
+         * InetAddress.getByName 不提供超时参数，DNS 服务器不可达时会长时间阻塞
+         * （不受 connectTimeoutMs 约束），导致不可用源一直挂到看门狗触发。
+         * 这里放到守护线程执行并以 Future 限时，超时按 UnknownHostException 处理，
+         * 从而能被 isSourceUnreachable() 识别并立即换源。
+         */
+        private fun resolve(host: String): InetAddress {
+            val future = dnsExecutor.submit<InetAddress> { InetAddress.getByName(host) }
+
+            return try {
+                future.get(connectTimeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            } catch (ex: TimeoutException) {
+                // 放弃等待；无法真正中断阻塞在 DNS 上的线程，但它是守护线程，
+                // 且系统解析器自身超时后线程会自然结束
+                future.cancel(true)
+                throw UnknownHostException("DNS解析超时: $host").apply { initCause(ex) }
+            } catch (ex: ExecutionException) {
+                val cause = ex.cause
+                throw if (cause is UnknownHostException) cause
+                else UnknownHostException("$host: ${cause?.message}").apply { initCause(cause) }
+            } catch (ex: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw UnknownHostException(host)
+            }
+        }
+
+        private fun newConnectedSocket(
+            address: InetAddress,
+            port: Int,
+            localAddress: InetAddress? = null,
+            localPort: Int = 0,
+        ): Socket = Socket().apply {
+            // 仅在调用方明确指定本地端点时绑定，否则保持系统默认自动绑定
+            if (localAddress != null || localPort != 0) {
+                bind(InetSocketAddress(localAddress, localPort))
+            }
+            connect(InetSocketAddress(address, port), connectTimeoutMs)
+        }
 
         override fun createSocket(host: String, port: Int): Socket =
-            newConnectedSocket(InetAddress.getByName(host), port)
+            newConnectedSocket(resolve(host), port)
 
         override fun createSocket(
             host: String,
             port: Int,
             localHost: InetAddress,
             localPort: Int,
-        ): Socket = newConnectedSocket(InetAddress.getByName(host), port)
+        ): Socket = newConnectedSocket(resolve(host), port, localHost, localPort)
 
         override fun createSocket(host: InetAddress, port: Int): Socket =
             newConnectedSocket(host, port)
@@ -119,7 +164,14 @@ class Media3VideoPlayer(
             port: Int,
             localAddress: InetAddress,
             localPort: Int,
-        ): Socket = newConnectedSocket(address, port)
+        ): Socket = newConnectedSocket(address, port, localAddress, localPort)
+
+        private companion object {
+            /** 仅用于执行可能阻塞的 DNS 解析，守护线程避免影响进程退出 */
+            private val dnsExecutor = Executors.newCachedThreadPool { runnable ->
+                Thread(runnable, "rtsp-dns-resolver").apply { isDaemon = true }
+            }
+        }
     }
 
     /** RTSP 连接超时：不低于 1s，且最多 5s，避免不可用源长时间占用换源流程 */
