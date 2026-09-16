@@ -75,14 +75,13 @@ class SettingsViewModel : ViewModel() {
             Configs.iptvLastChannelIdx = value
         }
 
-    // 直接每次从 Configs 读取，避免内存缓存与 SP 不一致
-    // （如 MainViewModel.onChannelChanged 直接修改 Configs 时，旧实现无法响应）
-    private val _iptvChannelUrlIdxMap by mutableStateOf(Configs.iptvChannelUrlIdx)
+    // 每次都直接从 Configs（SharedPreferences）读写，保证 set 后立即 get 能拿到新值。
+    // 旧实现用内存缓存会导致 set 写入 SP 后内存未刷新，get 始终读到初始空 Map → 切回频道永远从 0 开始。
     fun getIptvChannelUrlIdx(channel_name: String): Int {
-        return _iptvChannelUrlIdxMap.getOrDefault(channel_name, 0)
+        return Configs.iptvChannelUrlIdx.getOrDefault(channel_name, 0)
     }
     fun setIptvChannelUrlIdx(channel_name: String, value: Int) {
-        val newMap = _iptvChannelUrlIdxMap.toMutableMap()
+        val newMap = Configs.iptvChannelUrlIdx.toMutableMap()
         newMap[channel_name] = value
         Configs.iptvChannelUrlIdx = newMap
     }
