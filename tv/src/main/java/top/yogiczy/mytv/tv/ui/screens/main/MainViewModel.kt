@@ -61,6 +61,9 @@ class MainViewModel(
     private val lastInteractionEmit = AtomicLong(0)
     private val INTERACTION_THROTTLE_MS = 200L
 
+    // 最近一次成功加载的频道列表缓存，用于 EPG 刷新兜底
+    private var lastKnownChannelGroupList: ChannelGroupList? = null
+
     init {
         init()
         initIdleRefresh()
@@ -95,10 +98,12 @@ class MainViewModel(
             val cachedChannelGroupList = IptvRepository(Configs.iptvSourceCurrent).getCachedChannelGroupList()
             if (cachedChannelGroupList != null) {
                 log.i("从缓存中快速恢复频道列表")
-                _uiState.value = MainUiState.Ready(channelGroupList = hybridChannel(cachedChannelGroupList))
-                
+                val hydrated = hybridChannel(cachedChannelGroupList)
+                lastKnownChannelGroupList = hydrated  // 立即缓存，供后续 EPG 兜底使用
+                _uiState.value = MainUiState.Ready(channelGroupList = hydrated)
+
                 // 缓存恢复后并行拉取最新数据
-                launch { 
+                launch {
                     hybridJob.join() // 确保混合模式配置加载完再更新频道
                     refreshChannel(showLoading = false)
                     refreshEpg()
@@ -109,7 +114,7 @@ class MainViewModel(
                 refreshChannel(showLoading = true)
                 refreshEpg()
             }
-            
+
             probeIptvs()
         }
     }
@@ -249,6 +254,11 @@ class MainViewModel(
                 val currentState = _uiState.value
                 val isPopulated = it.channelList.isNotEmpty()
 
+                if (isPopulated) {
+                    // 缓存最近一次成功的频道列表，用于 refreshEpg 兜底（避免 UI 进 Error 后 EPG 永久不刷新）
+                    lastKnownChannelGroupList = it
+                }
+
                 if (currentState !is MainUiState.Ready || (isPopulated && currentState.channelGroupList != it)) {
                     _uiState.value = MainUiState.Ready(
                         channelGroupList = it,
@@ -302,39 +312,50 @@ class MainViewModel(
     private suspend fun refreshEpg() {
         if (!Configs.epgEnable) return
 
-        if (_uiState.value is MainUiState.Ready) {
-            EpgList.clearCache()
-            val channelGroupList = (_uiState.value as MainUiState.Ready).channelGroupList
+        // 优先使用入参 channelGroupList（来自 init），其次用最近一次成功的列表，最后才从 uiState 取
+        val channelGroupList = when {
+            _uiState.value is MainUiState.Ready -> (_uiState.value as MainUiState.Ready).channelGroupList
+            else -> lastKnownChannelGroupList
+        } ?: return
 
-            flow {
-                val epgUrl = channelGroupList.epgUrl
-                val epgSource = if (!epgUrl.isNullOrBlank()) {
-                    log.i("优先使用直播源自带节目单: $epgUrl")
-                    EpgSource(name = "直播源自带", url = epgUrl)
-                } else {
-                    log.i("使用系统设置节目单: ${Configs.epgSourceCurrent.url}")
-                    Configs.epgSourceCurrent
-                }
+        if (channelGroupList.channelList.isEmpty()) return
 
-                emit(
-                    EpgRepository(epgSource).getEpgList(
-                        filteredChannels = channelGroupList.channelList.map { it.epgName },
-                        refreshTimeThreshold = Configs.epgRefreshTimeThreshold,
-                    )
-                )
+        EpgList.clearCache()
+
+        flow {
+            val epgUrl = channelGroupList.epgUrl
+            val epgSource = if (!epgUrl.isNullOrBlank()) {
+                log.i("优先使用直播源自带节目单: $epgUrl")
+                EpgSource(name = "直播源自带", url = epgUrl)
+            } else {
+                log.i("使用系统设置节目单: ${Configs.epgSourceCurrent.url}")
+                Configs.epgSourceCurrent
             }
-                .retry(Constants.HTTP_RETRY_COUNT) { delay(Constants.HTTP_RETRY_INTERVAL); true }
-                .catch {
-                    emit(EpgList())
-                    Snackbar.show("节目单获取失败，请检查网络连接", type = SnackbarType.ERROR)
-                }
-                .map { epgList ->
-                    // Record current timestamp when EPG is successfully updated
-                    lastEpgUpdateTimestamp = System.currentTimeMillis()
-                    _uiState.value = (_uiState.value as MainUiState.Ready).copy(epgList = epgList)
-                }
-                .collect()
+
+            emit(
+                EpgRepository(epgSource).getEpgList(
+                    filteredChannels = channelGroupList.channelList.map { it.epgName },
+                    refreshTimeThreshold = Configs.epgRefreshTimeThreshold,
+                )
+            )
         }
+            .retry(Constants.HTTP_RETRY_COUNT) { delay(Constants.HTTP_RETRY_INTERVAL); true }
+            .catch {
+                emit(EpgList())
+                Snackbar.show("节目单获取失败，请检查网络连接", type = SnackbarType.ERROR)
+            }
+            .map { epgList ->
+                // Record current timestamp when EPG is successfully updated
+                lastEpgUpdateTimestamp = System.currentTimeMillis()
+                // 即使 uiState 不是 Ready（如 Error），也用最新的 channelGroupList 升级到 Ready
+                val current = _uiState.value
+                _uiState.value = if (current is MainUiState.Ready) {
+                    current.copy(epgList = epgList)
+                } else {
+                    MainUiState.Ready(channelGroupList = channelGroupList, epgList = epgList)
+                }
+            }
+            .collect()
     }
 }
 

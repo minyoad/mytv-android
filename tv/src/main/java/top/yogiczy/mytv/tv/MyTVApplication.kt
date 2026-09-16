@@ -11,6 +11,7 @@ import coil.request.CachePolicy
 import coil.util.DebugLogger
 import top.yogiczy.mytv.core.data.AppData
 import top.yogiczy.mytv.core.data.network.OkHttp
+import top.yogiczy.mytv.core.data.utils.Globals
 
 class MyTVApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
@@ -34,7 +35,8 @@ class MyTVApplication : Application(), ImageLoaderFactory {
             }
             .diskCache {
                 DiskCache.Builder()
-                    .directory(cacheDir.resolve("image_cache"))
+                    // 升级保留：使用 filesDir 下的 cache（AppData.init 已配置并自动从旧 cacheDir 迁移）
+                    .directory(Globals.cacheDir.resolve("image_cache"))
                     .maxSizePercent(0.1) // 增加到 10%
                     .build()
             }
