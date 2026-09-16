@@ -253,14 +253,6 @@ private fun MainScreenSettingsWrapper(
                 onUserInteraction()
                 false
             }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        awaitPointerEvent()
-                        onUserInteraction()
-                    }
-                }
-            }
             .focusOnLaunched()
             .focusable()
             .captureBackKey { onBackPressed() }

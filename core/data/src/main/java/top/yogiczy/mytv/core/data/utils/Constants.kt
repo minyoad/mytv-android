@@ -120,12 +120,12 @@ object Constants {
     /**
      * HTTP请求重试次数
      */
-    const val HTTP_RETRY_COUNT = 10L
+    const val HTTP_RETRY_COUNT = 3L
 
     /**
      * HTTP请求重试间隔时间（毫秒）
      */
-    const val HTTP_RETRY_INTERVAL = 3000L
+    const val HTTP_RETRY_INTERVAL = 1500L
 
     /**
      * 播放器 userAgent

@@ -99,40 +99,44 @@ class IptvRepository(
      */
     suspend fun getCachedChannelGroupList(): ChannelGroupList? {
         return try {
-            getCacheData()?.let { parseData(it) }
+            withContext(Dispatchers.IO) {
+                getCacheData()?.let { parseData(it) }
+            }
         } catch (ex: Exception) {
             null
         }
     }
 
     private suspend fun parseData(rawData: String): ChannelGroupList {
-        val sourceData = rawData.removeBom()
+        return withContext(Dispatchers.IO) {
+            val sourceData = rawData.removeBom()
 
-        val parser = IptvParser.instances.first { it.isSupport(source.url, sourceData) }
-        val startTime = System.currentTimeMillis()
-        val groupList = parser.parse(sourceData)
+            val parser = IptvParser.instances.first { it.isSupport(source.url, sourceData) }
+            val startTime = System.currentTimeMillis()
+            val groupList = parser.parse(sourceData)
 
-        // 在获取到频道列表后，统一生成数字序号 ID
-        idGenerator.reset()
-        val groupListWithIds = ChannelGroupList(
-            value = groupList.map { group ->
-                group.copy(channelList = ChannelList(group.channelList.map { channel ->
-                    channel.copy(id = idGenerator.nextId().toString())
-                }))
-            },
-            epgUrl = groupList.epgUrl,
-        )
+            // 在获取到频道列表后，统一生成数字序号 ID
+            idGenerator.reset()
+            val groupListWithIds = ChannelGroupList(
+                value = groupList.map { group ->
+                    group.copy(channelList = ChannelList(group.channelList.map { channel ->
+                        channel.copy(id = idGenerator.nextId().toString())
+                    }))
+                },
+                epgUrl = groupList.epgUrl,
+            )
 
-        log.i(
-            listOf(
-                "解析直播源（${source.name}）完成：${groupList.size}个分组",
-                "${groupList.sumOf { it.channelList.size }}个频道",
-                "${groupList.sumOf { it.channelList.sumOf { channel -> channel.urlList.size } }}条线路",
-                "耗时：${System.currentTimeMillis() - startTime}ms",
-            ).joinToString()
-        )
+            log.i(
+                listOf(
+                    "解析直播源（${source.name}）完成：${groupList.size}个分组",
+                    "${groupList.sumOf { it.channelList.size }}个频道",
+                    "${groupList.sumOf { it.channelList.sumOf { channel -> channel.urlList.size } }}条线路",
+                    "耗时：${System.currentTimeMillis() - startTime}ms",
+                ).joinToString()
+            )
 
-        return groupListWithIds
+            groupListWithIds
+        }
     }
 
     override suspend fun clearCache() {

@@ -154,14 +154,11 @@ class EpgRepository(
     suspend fun getEpgList(
         filteredChannels: List<String> = emptyList(),
         refreshTimeThreshold: Int,
-    ): EpgList = withContext(Dispatchers.Default) {
+    ): EpgList = withContext(Dispatchers.IO) {
         try {
             val xmlFile = epgXmlRepository.getEpgXmlFile()
-            
-            withContext(Dispatchers.IO) {
-                FileInputStream(xmlFile).use {
-                    parseFromXml(it, filteredChannels.toSet())
-                }
+            FileInputStream(xmlFile).use {
+                parseFromXml(it, filteredChannels.toSet())
             }
         } catch (ex: Exception) {
             log.e("获取节目单失败", ex)
@@ -182,8 +179,8 @@ private class EpgXmlRepository(
 ) : FileCacheRepository("epg-${url.hashCode().toUInt().toString(16)}.xml") {
     private val log = Logger.create(EpgXmlRepository::class.java.simpleName)
     private val epgClient = OkHttp.client.newBuilder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
     private val etagKey = "epg_etag_${url.hashCode().toUInt().toString(16)}"

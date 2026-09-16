@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicLong
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelList
@@ -55,6 +56,10 @@ class MainViewModel(
 
     // Add property to store last EPG update timestamp
     private var lastEpgUpdateTimestamp: Long = 0
+
+    // 用户交互节流：避免按键风暴期间 emit 风暴
+    private val lastInteractionEmit = AtomicLong(0)
+    private val INTERACTION_THROTTLE_MS = 200L
 
     init {
         init()
@@ -132,6 +137,11 @@ class MainViewModel(
     }
 
     fun onUserInteraction() {
+        // 200ms 节流：按键风暴期间不会每次都触发 EPG idle flow 重置
+        val now = System.currentTimeMillis()
+        val lastEmit = lastInteractionEmit.get()
+        if (now - lastEmit < INTERACTION_THROTTLE_MS) return
+        if (!lastInteractionEmit.compareAndSet(lastEmit, now)) return
         viewModelScope.launch {
             userInteractionFlow.emit(Unit)
         }
@@ -218,7 +228,8 @@ class MainViewModel(
             .retryWhen { _, attempt ->
                 if (attempt >= Constants.HTTP_RETRY_COUNT) return@retryWhen false
 
-                if (showLoading) {
+                // 只在首次重试时切换 UI 状态，避免反复重组整个主屏幕导致按键排队卡顿
+                if (showLoading && attempt == 0L) {
                     _uiState.value =
                         MainUiState.Loading("获取远程直播源(${attempt + 1}/${Constants.HTTP_RETRY_COUNT})...")
                 }
