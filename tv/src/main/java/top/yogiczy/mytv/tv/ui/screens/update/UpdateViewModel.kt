@@ -29,6 +29,17 @@ class UpdateViewModel : ViewModel() {
     private var _latestRelease by mutableStateOf(GitRelease())
     val latestRelease get() = _latestRelease
 
+    /**
+     * 每次 downloadAndUpdate 完成（下载成功或复用已下载）后自增，
+     * 用于让 UpdateScreen 的 LaunchedEffect 必然重启，从而触发安装流程。
+     *
+     * 之所以不直接用 updateDownloaded 作 key：用户首次点击下载成功后会设为 true，
+     * 再次点击"立即更新"（实际是已下载）时若不改变该值，LaunchedEffect 不会重启，
+     * 导致"已下载但没弹出安装界面"。
+     */
+    private var _installRequestToken by mutableStateOf(0)
+    val installRequestToken get() = _installRequestToken
+
 
     var visible by mutableStateOf(false)
 
@@ -67,9 +78,31 @@ class UpdateViewModel : ViewModel() {
         }
     }
 
+    /**
+     * 确保 latestFile 已下载属于当前 _latestRelease 的 APK。已下载且匹配则复用跳过下载。
+     * 完成后会自增 installRequestToken，触发 UpdateScreen 弹出安装界面。
+     */
     suspend fun downloadAndUpdate(latestFile: File) {
         if (!_isUpdateAvailable) return
         if (_isUpdating) return
+
+        val metaFile = File(latestFile.parentFile, "${latestFile.name}.meta")
+        val expectedUrl = _latestRelease.downloadUrl
+
+        // 修复：复用已下载文件。
+        // 通过 .meta 文件保存当前 release 的 downloadUrl，避免跨版本误用旧 APK。
+        // 原方案：每次都重新下载，即使上次已成功下载完也要重新拉一遍。
+        if (
+            latestFile.exists() &&
+            latestFile.length() > 0 &&
+            metaFile.exists() &&
+            runCatching { metaFile.readText() }.getOrNull() == expectedUrl
+        ) {
+            _updateDownloaded = true
+            _installRequestToken++
+            Snackbar.show("更新已下载", leadingLoading = false, duration = 2300)
+            return
+        }
 
         _isUpdating = true
         _updateDownloaded = false
@@ -81,7 +114,7 @@ class UpdateViewModel : ViewModel() {
         )
 
         try {
-            Downloader.downloadTo(_latestRelease.downloadUrl, latestFile.path) {
+            Downloader.downloadTo(expectedUrl, latestFile.path) {
                 Snackbar.show(
                     "正在下载更新: $it%",
                     leadingLoading = true,
@@ -90,10 +123,19 @@ class UpdateViewModel : ViewModel() {
                 )
             }
 
+            // Downloader 已做完整性校验（Content-Length 对比）。这里写入 meta 供下次复用校验。
+            metaFile.writeText(expectedUrl)
             _updateDownloaded = true
+            _installRequestToken++
             Snackbar.show("下载更新成功")
         } catch (ex: Exception) {
-            Snackbar.show("下载更新失败", type = SnackbarType.ERROR)
+            log.e("下载更新失败", ex)
+            // 失败时清理可能存在的半截文件和 meta，避免下次复用时误判
+            runCatching {
+                if (latestFile.exists()) latestFile.delete()
+                if (metaFile.exists()) metaFile.delete()
+            }
+            Snackbar.show("下载更新失败：${ex.message}", type = SnackbarType.ERROR)
         } finally {
             _isUpdating = false
         }

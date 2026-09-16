@@ -3,4 +3,9 @@
     <cache-path
         name="cache"
         path="." />
+    <!-- 升级保留：暴露 filesDir 给 FileProvider，使 ApkInstaller 可直接分享
+         升级包 APK（位于 filesDir/cache/latest.apk），无需再复制到 cacheDir。 -->
+    <files-path
+        name="files"
+        path="." />
 </paths>

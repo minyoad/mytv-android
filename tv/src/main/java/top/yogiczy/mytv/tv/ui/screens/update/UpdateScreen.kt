@@ -74,7 +74,7 @@ fun UpdateScreen(
             }
         }
 
-    LaunchedEffect(updateViewModel.updateDownloaded) {
+    LaunchedEffect(updateViewModel.installRequestToken) {
         if (!updateViewModel.updateDownloaded) return@LaunchedEffect
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
