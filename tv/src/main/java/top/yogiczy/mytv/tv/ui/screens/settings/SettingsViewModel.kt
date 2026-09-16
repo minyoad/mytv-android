@@ -75,14 +75,14 @@ class SettingsViewModel : ViewModel() {
             Configs.iptvLastChannelIdx = value
         }
 
-    private var _iptvChannelUrlIdxMap= mutableStateOf(mutableMapOf<String, Int>().apply {
-        putAll(Configs.iptvChannelUrlIdx)
-    })
-    fun getIptvChannelUrlIdx(channel_name:String):Int{
-        return _iptvChannelUrlIdxMap.value.getOrDefault(channel_name,0)
+    // 直接每次从 Configs 读取，避免内存缓存与 SP 不一致
+    // （如 MainViewModel.onChannelChanged 直接修改 Configs 时，旧实现无法响应）
+    private val _iptvChannelUrlIdxMap by mutableStateOf(Configs.iptvChannelUrlIdx)
+    fun getIptvChannelUrlIdx(channel_name: String): Int {
+        return _iptvChannelUrlIdxMap.getOrDefault(channel_name, 0)
     }
-    fun setIptvChannelUrlIdx(channel_name:String,value:Int){
-        val newMap = _iptvChannelUrlIdxMap.value.toMutableMap()
+    fun setIptvChannelUrlIdx(channel_name: String, value: Int) {
+        val newMap = _iptvChannelUrlIdxMap.toMutableMap()
         newMap[channel_name] = value
         Configs.iptvChannelUrlIdx = newMap
     }
@@ -249,20 +249,6 @@ class SettingsViewModel : ViewModel() {
         get() = _epgChannelReserveList
         set(value) {
             Configs.epgChannelReserveList = value
-        }
-
-    private var _epgRefreshIdleEnable by mutableStateOf(Configs.epgRefreshIdleEnable)
-    var epgRefreshIdleEnable: Boolean
-        get() = _epgRefreshIdleEnable
-        set(value) {
-            Configs.epgRefreshIdleEnable = value
-        }
-
-    private var _epgRefreshIdleDelay by mutableLongStateOf(Configs.epgRefreshIdleDelay)
-    var epgRefreshIdleDelay: Long
-        get() = _epgRefreshIdleDelay
-        set(value) {
-            Configs.epgRefreshIdleDelay = value
         }
 
     private var _uiShowEpgProgrammeProgress by mutableStateOf(Configs.uiShowEpgProgrammeProgress)
@@ -437,8 +423,6 @@ class SettingsViewModel : ViewModel() {
                     Configs.KEY.EPG_SOURCE_LIST -> _epgSourceList = Configs.epgSourceList
                     Configs.KEY.EPG_REFRESH_TIME_THRESHOLD -> _epgRefreshTimeThreshold = Configs.epgRefreshTimeThreshold
                     Configs.KEY.EPG_CHANNEL_RESERVE_LIST -> _epgChannelReserveList = Configs.epgChannelReserveList
-                    Configs.KEY.EPG_REFRESH_IDLE_ENABLE -> _epgRefreshIdleEnable = Configs.epgRefreshIdleEnable
-                    Configs.KEY.EPG_REFRESH_IDLE_DELAY -> _epgRefreshIdleDelay = Configs.epgRefreshIdleDelay
                     Configs.KEY.UI_SHOW_EPG_PROGRAMME_PROGRESS -> _uiShowEpgProgrammeProgress = Configs.uiShowEpgProgrammeProgress
                     Configs.KEY.UI_SHOW_EPG_PROGRAMME_PERMANENT_PROGRESS -> _uiShowEpgProgrammePermanentProgress = Configs.uiShowEpgProgrammePermanentProgress
                     Configs.KEY.UI_SHOW_CHANNEL_LOGO -> _uiShowChannelLogo = Configs.uiShowChannelLogo
@@ -487,6 +471,11 @@ class SettingsViewModel : ViewModel() {
             // 清理内存缓存
             EpgList.clearCache()
             context.imageLoader.memoryCache?.clear()
+
+            // 通知 MainViewModel：EPG 缓存已失效，下次 onAppResume / init() 会立即拉取新 EPG
+            // （即使 onComplete 中调用 mainViewModel.init()，本信号仍可作为冗余保护，
+            //   且 init() 会重置整个 UI 为 Loading 状态，本信号让 EPG 单独刷新更轻量）
+            top.yogiczy.mytv.tv.ui.screens.main.MainViewModel.notifyEpgCacheInvalidated()
 
             Snackbar.show("已清除所有缓存")
             onComplete()

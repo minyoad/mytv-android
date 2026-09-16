@@ -8,7 +8,6 @@ import coil.imageLoader
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,14 +15,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicLong
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelList
@@ -48,39 +45,19 @@ class MainViewModel(
     private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Loading())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
-    private val userInteractionFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-
-    private val idleSettingsFlow = MutableStateFlow(
-        Pair(Configs.epgRefreshIdleEnable, Configs.epgRefreshIdleDelay)
-    )
-
-    // Add property to store last EPG update timestamp
+    // 最近一次成功拉取 EPG 的时间戳（毫秒）
+    // 用于 onAppResume 判断是否跨日，以及 invalidateEpg 后重置
     private var lastEpgUpdateTimestamp: Long = 0
-
-    // 用户交互节流：避免按键风暴期间 emit 风暴
-    private val lastInteractionEmit = AtomicLong(0)
-    private val INTERACTION_THROTTLE_MS = 200L
 
     // 最近一次成功加载的频道列表缓存，用于 EPG 刷新兜底
     private var lastKnownChannelGroupList: ChannelGroupList? = null
 
     init {
-        init()
-        initIdleRefresh()
-        initSettingsListener()
-    }
-
-    private fun initSettingsListener() {
+        // 订阅跨 ViewModel 的 EPG 缓存失效信号（如清缓存后通知重新拉取）
         viewModelScope.launch {
-            Configs.onKeyChanged.collect { key ->
-                when (key) {
-                    Configs.KEY.EPG_REFRESH_IDLE_ENABLE, Configs.KEY.EPG_REFRESH_IDLE_DELAY -> {
-                        idleSettingsFlow.value = Pair(Configs.epgRefreshIdleEnable, Configs.epgRefreshIdleDelay)
-                    }
-                    else -> {}
-                }
-            }
+            EPG_CACHE_INVALIDATE_SIGNAL.collect { invalidateEpg() }
         }
+        init()
     }
 
     fun init() {
@@ -119,39 +96,6 @@ class MainViewModel(
         }
     }
 
-    @OptIn(FlowPreview::class)
-    private fun initIdleRefresh() {
-        viewModelScope.launch {
-            userInteractionFlow.emit(Unit)
-            
-            // 使用 combine 监听交互和设置变化
-            kotlinx.coroutines.flow.combine(userInteractionFlow, idleSettingsFlow) { _, settings ->
-                settings
-            }
-                .debounce { (enable, delay) -> if (enable) delay else Long.MAX_VALUE }
-                .collect { (enable, _) ->
-                    if (enable) {
-                        refreshEpg()
-                    }
-                }
-        }
-    }
-
-    fun setIdleSettings(enable: Boolean, delay: Long) {
-        idleSettingsFlow.value = Pair(enable, delay)
-    }
-
-    fun onUserInteraction() {
-        // 200ms 节流：按键风暴期间不会每次都触发 EPG idle flow 重置
-        val now = System.currentTimeMillis()
-        val lastEmit = lastInteractionEmit.get()
-        if (now - lastEmit < INTERACTION_THROTTLE_MS) return
-        if (!lastInteractionEmit.compareAndSet(lastEmit, now)) return
-        viewModelScope.launch {
-            userInteractionFlow.emit(Unit)
-        }
-    }
-
     fun preloadLogos(context: Context, channelGroupList: ChannelGroupList) {
         if (!Configs.uiShowChannelLogo) return
 
@@ -168,29 +112,47 @@ class MainViewModel(
         }
     }
 
-    // Add method to handle app resume
+    /**
+     * 应用从后台回到前台时，按需刷新 EPG。
+     *
+     * 触发条件（任一满足即刷新）：
+     * 1. **跨日**：本地 EPG 是前一天的数据（EPG 服务器通常一天更新一次，无意义高频刷新）
+     * 2. **本地没有 EPG**：从未成功拉取过，或当前 epgList 为空（用户清缓存、缓存被系统清理等场景）
+     *
+     * 这两个条件之外（本地有 EPG 且仍在同一天），不触发刷新。
+     */
     fun onAppResume() {
         viewModelScope.launch {
             val currentDate = LocalDate.now()
-            val lastUpdateDate = java.time.Instant.ofEpochMilli(lastEpgUpdateTimestamp)
-                .atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+            val lastUpdateDate = lastEpgUpdateTimestamp.takeIf { it != 0L }
+                ?.let {
+                    java.time.Instant.ofEpochMilli(it)
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toLocalDate()
+                }
 
-            if (lastEpgUpdateTimestamp != 0L && lastUpdateDate != currentDate) {
-                // Date changed, refresh EPG
-                refreshEpg()
-            } else if (Configs.epgRefreshIdleEnable &&
-                lastEpgUpdateTimestamp != 0L &&
-                System.currentTimeMillis() - lastEpgUpdateTimestamp > Configs.epgRefreshIdleDelay
-            ) {
-                // Idle time exceeded while in background, refresh EPG
+            // 条件 1: 跨日 → 刷新
+            val isDateChanged = lastUpdateDate != null && lastUpdateDate != currentDate
+
+            // 条件 2: 本地没 EPG → 刷新
+            // - 从未成功拉过（lastEpgUpdateTimestamp == 0L）
+            // - 或当前 uiState.epgList 为空（拉到但无数据，或被清空）
+            val hasNoEpg = lastEpgUpdateTimestamp == 0L ||
+                (_uiState.value as? MainUiState.Ready)?.epgList?.isEmpty() == true
+
+            if (isDateChanged || hasNoEpg) {
                 refreshEpg()
             }
         }
     }
-    private fun onChannelChanged() {
-        viewModelScope.launch {
-            Configs.iptvChannelUrlIdx= emptyMap()
-        }
+
+    /**
+     * 标记 EPG 缓存已失效并立即重新拉取。
+     * 供外部模块（如 SettingsViewModel.clearCache）通过 notifyEpgCacheInvalidated() 触发。
+     */
+    private fun invalidateEpg() {
+        lastEpgUpdateTimestamp = 0L
+        viewModelScope.launch { refreshEpg() }
     }
 
     private fun probeIptvs() {
@@ -225,10 +187,7 @@ class MainViewModel(
     private suspend fun refreshChannel(showLoading: Boolean = true) {
         flow {
             val iptvRepository = IptvRepository(Configs.iptvSourceCurrent)
-            iptvRepository.setDataChanged({ onChannelChanged() })
-            emit(
-                iptvRepository.getChannelGroupList(cacheTime = Configs.iptvSourceCacheTime)
-            )
+            emit(iptvRepository.getChannelGroupList(cacheTime = Configs.iptvSourceCacheTime))
         }
             .retryWhen { _, attempt ->
                 if (attempt >= Constants.HTTP_RETRY_COUNT) return@retryWhen false
@@ -356,6 +315,21 @@ class MainViewModel(
                 }
             }
             .collect()
+    }
+
+    companion object {
+        // 进程级 SharedFlow：用于跨 ViewModel 通信。
+        // 当前用途：SettingsViewModel.clearCache() 后通知 MainViewModel EPG 缓存失效。
+        // extraBufferCapacity = 1 保证 emit 不会因暂无订阅者而丢失（最多缓存一个事件）。
+        private val EPG_CACHE_INVALIDATE_SIGNAL = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+        /**
+         * 通知 EPG 缓存已失效。供外部模块（如清缓存）调用，
+         * MainViewModel 监听后会重置时间戳并立即重新拉取 EPG。
+         */
+        fun notifyEpgCacheInvalidated() {
+            EPG_CACHE_INVALIDATE_SIGNAL.tryEmit(Unit)
+        }
     }
 }
 

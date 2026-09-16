@@ -58,13 +58,6 @@ fun MainScreen(
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    LaunchedEffect(settingsViewModel.epgRefreshIdleEnable, settingsViewModel.epgRefreshIdleDelay) {
-        mainViewModel.setIdleSettings(
-            settingsViewModel.epgRefreshIdleEnable,
-            settingsViewModel.epgRefreshIdleDelay
-        )
-    }
-
     // 首次启动时，若未手动设置省份，则根据当前IP自动解析
     LaunchedEffect(Unit) {
         if (settingsViewModel.iptvProvinceCurrent.isBlank()) {
@@ -114,19 +107,16 @@ fun MainScreen(
             },
             epgListProvider = { s.epgList },
             onBackPressed = onBackPressed,
-            onUserInteraction = { mainViewModel.onUserInteraction() },
         )
 
         is MainUiState.Loading -> MainScreenSettingsWrapper(
             onBackPressed = onBackPressed,
-            onUserInteraction = { mainViewModel.onUserInteraction() },
         ) {
             MainScreenLoading(messageProvider = { s.message })
         }
 
         is MainUiState.Error -> MainScreenSettingsWrapper(
             onBackPressed = onBackPressed,
-            onUserInteraction = { mainViewModel.onUserInteraction() },
         ) {
             MainScreenError(messageProvider = { s.message })
         }
@@ -242,7 +232,6 @@ private fun MainScreenErrorPreview() {
 private fun MainScreenSettingsWrapper(
     modifier: Modifier = Modifier,
     onBackPressed: () -> Unit = {},
-    onUserInteraction: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     var showSettings by remember { mutableStateOf(false) }
@@ -250,7 +239,6 @@ private fun MainScreenSettingsWrapper(
     Box(
         modifier = modifier
             .onPreviewKeyEvent {
-                onUserInteraction()
                 false
             }
             .focusOnLaunched()
