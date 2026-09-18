@@ -2,16 +2,22 @@ package top.yogiczy.mytv.core.data.network
 
 import android.os.Build
 import okhttp3.OkHttpClient
+import top.yogiczy.mytv.core.data.utils.Globals
 import top.yogiczy.mytv.core.util.utils.UnsafeTrustManager
 import java.util.concurrent.TimeUnit
 
 object OkHttp {
     /**
-     * 自定义 User-Agent（包含 mytv 标识），统一附加到未显式指定 UA 的请求
+     * 自定义 User-Agent（包含 mytv 标识与应用版本号），统一附加到未显式指定 UA 的请求
+     *
+     * 示例：MyTV-android/2.6.1-beta (okhttp; Android 33; Xiaomi MiTV)
+     *
+     * 版本号取自运行时实际安装版本（Globals.appVersionName），且不使用 by lazy 缓存，
+     * 以避免初始化早于 AppData.init 时固化成 unknown。
      */
-    val USER_AGENT: String by lazy {
-        "MyTV-android (okhttp; Android ${Build.VERSION.SDK_INT}; ${Build.MANUFACTURER} ${Build.MODEL})"
-    }
+    val USER_AGENT: String
+        get() = "MyTV-android/${Globals.appVersionName} " +
+            "(okhttp; Android ${Build.VERSION.SDK_INT}; ${Build.MANUFACTURER} ${Build.MODEL})"
 
     val client: OkHttpClient by lazy {
         OkHttpClient.Builder()

@@ -1,6 +1,8 @@
 package top.yogiczy.mytv.core.data
 
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import top.yogiczy.mytv.core.data.utils.Globals
 import top.yogiczy.mytv.core.data.utils.Logger
 import top.yogiczy.mytv.core.data.utils.SP
@@ -10,6 +12,8 @@ object AppData {
     private val log = Logger.create(AppData::class.java.simpleName)
 
     fun init(context: Context) {
+        Globals.appVersionName = resolveAppVersionName(context)
+
         // 关键：使用 filesDir/cache 而不是 context.cacheDir，
         // 升级（覆盖安装）时 cacheDir 常被系统清空，filesDir 不会。
         val targetDir = File(context.filesDir, "cache")
@@ -24,6 +28,26 @@ object AppData {
         Globals.cacheDir = targetDir
         SP.init(context)
     }
+
+    /**
+     * 读取当前实际安装的版本名，供 HTTP User-Agent 等场景使用
+     *
+     * 使用 PackageManager 而非各模块的 BuildConfig：本模块 defaultConfig 未声明 versionName，
+     * 若改用 BuildConfig 需额外同步维护，容易与 app 模块版本不一致。
+     */
+    private fun resolveAppVersionName(context: Context): String = runCatching {
+        val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.getPackageInfo(
+                context.packageName,
+                PackageManager.PackageInfoFlags.of(0),
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.getPackageInfo(context.packageName, 0)
+        }
+
+        packageInfo.versionName
+    }.getOrNull()?.takeIf { it.isNotBlank() } ?: "unknown"
 
     private fun migrateLegacyCacheDir(context: Context, target: File) {
         val legacy = context.cacheDir
