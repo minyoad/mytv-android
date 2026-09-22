@@ -3,6 +3,7 @@ package top.yogiczy.mytv.tv.ui.screens.main.components
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -15,6 +16,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.flow.collect
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelIdx
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelList
@@ -87,20 +89,36 @@ fun MainContent(
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // 监听生命周期：从后台回到前台时立即刷新当前频道
+    // 监听生命周期：从后台回到前台时强制重新播放，丢弃后台期间累积的播放缓存。
+    // 直播流在后台仍在缓冲，回到前台后播放器会继续消费这些旧数据，
+    // 画面停留在离开时的内容，只有重新 prepare 才能拉到最新画面。
+    // wasStopped 用于跳过首次启动，避免与 MainContentState.init 的首次 prepare 重复。
     DisposableEffect(lifecycleOwner) {
+        var wasStopped = false
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_START) {
-                // 重新走一遍“换台”逻辑，达到刷新目的
-                mainContentState.changeCurrentChannel(
-                    mainContentState.currentChannel,
-                    mainContentState.currentChannelUrlIdx
-                )
+            when (event) {
+                Lifecycle.Event.ON_STOP -> wasStopped = true
+                Lifecycle.Event.ON_START -> {
+                    if (wasStopped) {
+                        wasStopped = false
+                        mainContentState.restartCurrentChannel()
+                    }
+                }
+
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // 直播源刷新后重新绑定当前播放频道。
+    // 频道 id 每次解析都会从 1 重新编号，沿用旧 Channel 对象会导致换台索引错位。
+    LaunchedEffect(Unit) {
+        MainViewModel.channelListUpdated.collect { newChannelGroupList ->
+            mainContentState.relocateCurrentChannel(newChannelGroupList)
         }
     }
 

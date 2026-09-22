@@ -125,7 +125,7 @@ class MainContentState(
                 val receiver = object : BroadcastReceiver() {
                     override fun onReceive(ctx: Context, intent: Intent) {
                         if (intent.action == "top.yogiczy.mytv.tv.RESTART_PLAY") {
-                            changeCurrentChannel(_currentChannel, _currentChannelUrlIdx, _currentPlaybackEpgProgramme)
+                            restartCurrentChannel()
                         }
                     }
                 }
@@ -172,11 +172,8 @@ class MainContentState(
         }
 
         videoPlayerState.onInterrupt {
-            changeCurrentChannel(
-                _currentChannel,
-                _currentChannelUrlIdx,
-                _currentPlaybackEpgProgramme
-            )
+            // 播放位置长时间不推进视为卡住，需强制重新拉流恢复
+            restartCurrentChannel()
         }
     }
 
@@ -224,19 +221,27 @@ class MainContentState(
     private fun getPrevChannel(): Channel {
         return getPrevFavoriteChannel() ?: run {
             val channelGroupList = channelGroupListProvider()
+            val channelList = channelGroupList.channelList
+            if (channelList.isEmpty()) return Channel()
+
             val currentIdx = channelGroupList.channelIdx(_currentChannel)
-            return channelGroupList.channelList.getOrElse(currentIdx - 1) {
-                channelGroupList.channelList.lastOrNull() ?: Channel()
-            }
+            // currentIdx < 0 表示当前频道已不在列表中（如直播源刷新后残留旧对象）。
+            // 显式处理，不再依赖 getOrElse 的越界兜底（原写法会传入 -1 之类的非法下标）。
+            return if (currentIdx <= 0) channelList.last() else channelList[currentIdx - 1]
         }
     }
 
     private fun getNextChannel(): Channel {
         return getNextFavoriteChannel() ?: run {
             val channelGroupList = channelGroupListProvider()
+            val channelList = channelGroupList.channelList
+            if (channelList.isEmpty()) return Channel()
+
             val currentIdx = channelGroupList.channelIdx(_currentChannel)
-            return channelGroupList.channelList.getOrElse(currentIdx + 1) {
-                channelGroupList.channelList.firstOrNull() ?: Channel()
+            return if (currentIdx < 0 || currentIdx >= channelList.lastIndex) {
+                channelList.first()
+            } else {
+                channelList[currentIdx + 1]
             }
         }
     }
@@ -251,12 +256,17 @@ class MainContentState(
         return max(0, min(idx, urlList.size - 1))
     }
 
+    /**
+     * @param force 强制重新播放。为 true 时跳过幂等守卫，
+     * 即使频道、线路、回看节目都与当前完全一致也重新 prepare。
+     */
     fun changeCurrentChannel(
         channel: Channel,
         urlIdx: Int? = null,
         playbackEpgProgramme: EpgProgramme? = null,
+        force: Boolean = false,
     ) {
-        if (channel == _currentChannel && urlIdx == _currentChannelUrlIdx && playbackEpgProgramme == _currentPlaybackEpgProgramme) return
+        if (!force && channel == _currentChannel && urlIdx == _currentChannelUrlIdx && playbackEpgProgramme == _currentPlaybackEpgProgramme) return
 
         if (channel == _currentChannel && urlIdx != _currentChannelUrlIdx) {
             settingsViewModel.iptvPlayableHostList -= getUrlHost(_currentChannel.urlList[_currentChannelUrlIdx])
@@ -292,6 +302,73 @@ class MainContentState(
         } else {
             videoPlayerState.prepare(url)
         }
+    }
+
+    /**
+     * 直播源刷新后，将当前播放频道重新映射到新列表。
+     *
+     * Channel 的相等性（data class equals）包含自增 id，而每次解析直播源都会
+     * 先 IdGenerator.reset() 再从 1 重新编号。若继续沿用旧 Channel 对象，
+     * channelIdx() 按 id 匹配会命中错误条目（例如服务端在头部插入频道后，
+     * 原 id=1 的位置已被新频道占用）。这里改用跨批次稳定的 name/epgName 定位。
+     *
+     * 播放地址未发生变化时不会重新 prepare，避免打断正在播放的画面。
+     *
+     * @param newChannelGroupList 刷新后的完整频道列表（未经分组隐藏/省份过滤）
+     */
+    fun relocateCurrentChannel(newChannelGroupList: ChannelGroupList) {
+        val newList = newChannelGroupList.channelList
+        if (newList.isEmpty()) return
+
+        val oldChannel = _currentChannel
+        if (oldChannel.name.isBlank()) return
+
+        val target = newList.firstOrNull { it.name == oldChannel.name }
+            ?: newList.firstOrNull { it.epgName == oldChannel.epgName }
+            ?: run {
+                log.w("直播源已更新，但当前频道已不存在：${oldChannel.name}")
+                return
+            }
+
+        if (target == oldChannel) return
+
+        val urlIdx = _currentChannelUrlIdx.coerceIn(0, (target.urlList.size - 1).coerceAtLeast(0))
+        val oldUrl = oldChannel.urlList.getOrNull(_currentChannelUrlIdx)
+        val newUrl = target.urlList.getOrNull(urlIdx)
+
+        // 播放地址未变化：仅同步当前频道对象与记忆位置，不打断播放
+        if (urlIdx == _currentChannelUrlIdx && newUrl == oldUrl) {
+            _currentChannel = target
+            settingsViewModel.iptvLastChannelIdx = channelGroupListProvider().channelIdx(target)
+                .takeIf { it >= 0 }
+                ?: newChannelGroupList.channelIdx(target).coerceAtLeast(0)
+            log.d("直播源已更新，重新绑定当前频道：${target.name}")
+            return
+        }
+
+        log.d("直播源已更新，当前频道播放地址变化，重新播放：${target.name}")
+        changeCurrentChannel(target, urlIdx, _currentPlaybackEpgProgramme)
+    }
+
+    /**
+     * 强制重新播放当前频道。
+     *
+     * 用于「频道/线路/回看节目都没变、但仍需重新拉流」的场景：
+     * - 应用从后台回到前台：直播流在后台仍在缓冲，回到前台后播放器继续消费
+     *   后台期间累积的缓存，画面停留在离开时的旧内容，必须重新 prepare 才能拉到最新画面。
+     * - 播放卡住（onInterrupt）：需要重新建流恢复。
+     * - RESTART_PLAY 广播。
+     *
+     * 直接调用 changeCurrentChannel 会被其幂等守卫拦截（三者都未变化），故需 force。
+     */
+    fun restartCurrentChannel() {
+        log.d("强制重新播放当前频道：${_currentChannel.name}")
+        changeCurrentChannel(
+            _currentChannel,
+            _currentChannelUrlIdx,
+            _currentPlaybackEpgProgramme,
+            force = true,
+        )
     }
 
     fun changeCurrentChannelToPrev() {

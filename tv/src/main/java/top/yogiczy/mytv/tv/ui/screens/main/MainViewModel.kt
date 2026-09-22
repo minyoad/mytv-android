@@ -12,6 +12,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
@@ -57,6 +59,7 @@ class MainViewModel(
         viewModelScope.launch {
             EPG_CACHE_INVALIDATE_SIGNAL.collect { invalidateEpg() }
         }
+        startChannelPeriodicCheck()
         init()
     }
 
@@ -155,6 +158,26 @@ class MainViewModel(
         viewModelScope.launch { refreshEpg() }
     }
 
+    /**
+     * 周期检查直播源是否有更新。
+     *
+     * 电视端 App 通常连续在前台运行数小时甚至数天，Activity 不重建、onAppResume
+     * 也不会触发，导致 init() 中的过期检查只有冷启动时才执行一次，服务器更新无法感知。
+     * 这里定时唤起 refreshChannel；是否真正发起网络请求由 IptvRepository 侧的
+     * cacheTime 窗口节流（未过期直接读缓存，过期才走 ETag 协商），
+     * 因此定时唤起本身不会产生额外请求压力。
+     */
+    private fun startChannelPeriodicCheck() {
+        viewModelScope.launch {
+            while (true) {
+                delay(Constants.IPTV_SOURCE_CHECK_INTERVAL)
+                val changed = runCatching { refreshChannel(showLoading = false) }.getOrDefault(false)
+                // 频道列表变化后，节目单所依赖的频道名可能随之变化，需同步刷新
+                if (changed) refreshEpg()
+            }
+        }
+    }
+
     private fun probeIptvs() {
         if (!Configs.iptvAutoProbe) return
 
@@ -184,7 +207,14 @@ class MainViewModel(
         }
     }
 
-    private suspend fun refreshChannel(showLoading: Boolean = true) {
+    /**
+     * 拉取直播源。是否真正发起网络请求由 IptvRepository 的 cacheTime 窗口决定。
+     *
+     * @return 频道列表是否发生变化（false 表示与上次一致、列表为空或拉取失败）
+     */
+    private suspend fun refreshChannel(showLoading: Boolean = true): Boolean {
+        var changed = false
+
         flow {
             val iptvRepository = IptvRepository(Configs.iptvSourceCurrent)
             emit(iptvRepository.getChannelGroupList(cacheTime = Configs.iptvSourceCacheTime))
@@ -223,12 +253,17 @@ class MainViewModel(
                         channelGroupList = it,
                         epgList = (currentState as? MainUiState.Ready)?.epgList ?: EpgList()
                     )
+                    changed = true
+                    // 频道 id 每次解析都会重新编号，通知播放层把当前频道重新映射到新列表
+                    CHANNEL_LIST_UPDATED_SIGNAL.tryEmit(it)
                 } else if (!isPopulated && !showLoading) {
                     log.w("后台刷新直播源获取到空列表，已忽略以防止 UI 变空")
                 }
                 it
             }
             .collect()
+
+        return changed
     }
 
     private suspend fun hybridChannel(channelGroupList: ChannelGroupList) =
@@ -330,6 +365,17 @@ class MainViewModel(
         fun notifyEpgCacheInvalidated() {
             EPG_CACHE_INVALIDATE_SIGNAL.tryEmit(Unit)
         }
+
+        /**
+         * 直播源刷新后频道列表发生变化的信号，携带最新的完整频道列表。
+         *
+         * 播放层（MainContent）监听后调用 MainContentState.relocateCurrentChannel()，
+         * 按频道名把当前播放频道重新绑定到新列表中的对应条目。
+         * 之所以不直接监听 uiState 的列表变化，是因为 UI 上的列表还叠加了
+         * 分组隐藏/省份过滤，切换这些设置也会导致列表变化，但并不应该触发重定位。
+         */
+        private val CHANNEL_LIST_UPDATED_SIGNAL = MutableSharedFlow<ChannelGroupList>(extraBufferCapacity = 1)
+        val channelListUpdated: SharedFlow<ChannelGroupList> = CHANNEL_LIST_UPDATED_SIGNAL.asSharedFlow()
     }
 }
 

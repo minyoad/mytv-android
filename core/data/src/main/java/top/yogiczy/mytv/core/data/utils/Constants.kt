@@ -65,6 +65,16 @@ object Constants {
     const val IPTV_SOURCE_CACHE_TIME = 1000 * 60 * 60 * 24L // 24小时
 
     /**
+     * 直播源周期检查间隔（毫秒）
+     *
+     * 电视端 App 会长时间停留在前台，Activity 不重建、也不会走 onResume，
+     * 导致 init() 中的过期检查只有冷启动时才执行一次。此处定时唤起检查，
+     * 是否真正发起网络请求仍由 IPTV_SOURCE_CACHE_TIME 窗口节流，
+     * 因此定时唤起本身不产生额外请求压力。
+     */
+    const val IPTV_SOURCE_CHECK_INTERVAL = 1000 * 60 * 30L // 30分钟
+
+    /**
      * 节目单来源
      */
     val EPG_SOURCE_LIST = EpgSourceList(
