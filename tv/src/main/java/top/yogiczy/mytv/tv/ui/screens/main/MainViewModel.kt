@@ -254,6 +254,9 @@ class MainViewModel(
                         epgList = (currentState as? MainUiState.Ready)?.epgList ?: EpgList()
                     )
                     changed = true
+                    // 直播源已更新，假定失效线路已从新列表中移除，旧的线路索引记忆不再有效，
+                    // 全部复位到 0；后续某条线路播放成功时再由 setIptvChannelUrlIdx 重新记录。
+                    Configs.iptvChannelUrlIdx = emptyMap()
                     // 频道 id 每次解析都会重新编号，通知播放层把当前频道重新映射到新列表
                     CHANNEL_LIST_UPDATED_SIGNAL.tryEmit(it)
                 } else if (!isPopulated && !showLoading) {

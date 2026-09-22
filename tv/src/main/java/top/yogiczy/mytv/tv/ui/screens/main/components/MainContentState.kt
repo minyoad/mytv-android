@@ -305,14 +305,20 @@ class MainContentState(
     }
 
     /**
-     * 直播源刷新后，将当前播放频道重新映射到新列表。
+     * 直播源刷新后，将当前播放频道重新绑定到新列表中的对应条目（仅替换引用）。
      *
      * Channel 的相等性（data class equals）包含自增 id，而每次解析直播源都会
      * 先 IdGenerator.reset() 再从 1 重新编号。若继续沿用旧 Channel 对象，
      * channelIdx() 按 id 匹配会命中错误条目（例如服务端在头部插入频道后，
-     * 原 id=1 的位置已被新频道占用）。这里改用跨批次稳定的 name/epgName 定位。
+     * 原 id=1 的位置已被新频道占用），换台就会跳错。这里改用跨批次稳定的
+     * name/epgName 定位。
      *
-     * 播放地址未发生变化时不会重新 prepare，避免打断正在播放的画面。
+     * 正在播放的内容不做任何改动：本方法不会重新 prepare，播放器继续消费当前流，
+     * 即使该线路在新列表中已被移除也一样（播不动时由 onError 自行换源）。
+     *
+     * 新的线路要等下次切台时才生效——届时 iptvChannelUrlIdx 已被清空，
+     * getUrlIdx() 会重新从线路 0 开始挑选。这里只更新内部引用，
+     * 目的是让换台时的 channelIdx() 能正确定位到相邻频道。
      *
      * @param newChannelGroupList 刷新后的完整频道列表（未经分组隐藏/省份过滤）
      */
@@ -330,24 +336,17 @@ class MainContentState(
                 return
             }
 
-        if (target == oldChannel) return
+        if (target == oldChannel || target.urlList.isEmpty()) return
 
-        val urlIdx = _currentChannelUrlIdx.coerceIn(0, (target.urlList.size - 1).coerceAtLeast(0))
-        val oldUrl = oldChannel.urlList.getOrNull(_currentChannelUrlIdx)
-        val newUrl = target.urlList.getOrNull(urlIdx)
-
-        // 播放地址未变化：仅同步当前频道对象与记忆位置，不打断播放
-        if (urlIdx == _currentChannelUrlIdx && newUrl == oldUrl) {
-            _currentChannel = target
-            settingsViewModel.iptvLastChannelIdx = channelGroupListProvider().channelIdx(target)
-                .takeIf { it >= 0 }
-                ?: newChannelGroupList.channelIdx(target).coerceAtLeast(0)
-            log.d("直播源已更新，重新绑定当前频道：${target.name}")
-            return
-        }
-
-        log.d("直播源已更新，当前频道播放地址变化，重新播放：${target.name}")
-        changeCurrentChannel(target, urlIdx, _currentPlaybackEpgProgramme)
+        // 线路数变少导致旧索引越界时回落到 0，而不是压到末位：
+        // 后者会让 onError 因「idx < size-1」不成立而放弃换源重试。
+        // 只改索引不影响正在播放的流，实际生效要等下次切台或换源。
+        _currentChannelUrlIdx = _currentChannelUrlIdx.takeIf { it <= target.urlList.lastIndex } ?: 0
+        _currentChannel = target
+        settingsViewModel.iptvLastChannelIdx = channelGroupListProvider().channelIdx(target)
+            .takeIf { it >= 0 }
+            ?: newChannelGroupList.channelIdx(target).coerceAtLeast(0)
+        log.d("直播源已更新，重新绑定当前频道：${target.name}")
     }
 
     /**
