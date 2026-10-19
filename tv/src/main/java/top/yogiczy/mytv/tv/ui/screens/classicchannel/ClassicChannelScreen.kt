@@ -41,7 +41,6 @@ import androidx.tv.material3.Text
 import top.yogiczy.mytv.core.data.entities.channel.Channel
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroup
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
-import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelGroupIdx
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelIdx
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelList
@@ -60,7 +59,6 @@ import top.yogiczy.mytv.tv.ui.screens.components.rememberScreenAutoCloseState
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.player.VideoPlayer
 import top.yogiczy.mytv.tv.ui.theme.MyTVTheme
 import top.yogiczy.mytv.tv.ui.tooling.PreviewWithLayoutGrids
-import kotlin.math.max
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -89,42 +87,64 @@ fun ClassicChannelScreen(
 ) {
     val screenAutoCloseState = rememberScreenAutoCloseState(onTimeout = onClose)
     val channelGroupList = channelGroupListProvider()
+    val favoriteChannelList = favoriteChannelListProvider()
     val channelFavoriteListVisible = remember { channelFavoriteListVisibleProvider() }
     val channelFavoriteEnabled = channelFavoriteEnabledProvider()
 
-    val displayedChannelGroupList = remember(channelGroupList, channelFavoriteEnabled) {
-        if (channelFavoriteEnabled)
+    // 收藏分组为空时不展示：若选中它，频道列会变成一个没有任何可聚焦项的空列表
+    val favoriteGroupVisible = channelFavoriteEnabled && favoriteChannelList.isNotEmpty()
+
+    val displayedChannelGroupList = remember(channelGroupList, favoriteGroupVisible) {
+        if (favoriteGroupVisible)
             ChannelGroupList(listOf(ClassicPanelScreenFavoriteChannelGroup) + channelGroupList)
         else
             channelGroupList
     }
 
-    var focusedChannelGroup by remember(channelGroupList) {
+    // 初始分组：收藏优先，其次当前频道所在分组，最后回退到第一个非空分组
+    val initialChannelGroup = remember(channelGroupList, favoriteGroupVisible) {
         val currentChannel = currentChannelProvider()
-        mutableStateOf(
-            if (channelFavoriteListVisible)
-                ClassicPanelScreenFavoriteChannelGroup
-            else
-                channelGroupList.find { it.channelList.any { c -> c.name == currentChannel.name } }
-                    ?: channelGroupList.getOrNull(max(0, channelGroupList.channelGroupIdx(currentChannel)))
-                    ?: ChannelGroup()
-        )
+        if (favoriteGroupVisible && channelFavoriteListVisible)
+            ClassicPanelScreenFavoriteChannelGroup
+        else channelGroupList.find { it.channelList.any { c -> c.name == currentChannel.name } }
+            ?: channelGroupList.firstOrNull { it.channelList.isNotEmpty() }
+            ?: channelGroupList.firstOrNull()
+            ?: ChannelGroup()
     }
+
+    var focusedChannelGroup by remember { mutableStateOf(initialChannelGroup) }
     var focusedChannel by remember { mutableStateOf(currentChannelProvider()) }
     var epgListVisible by remember { mutableStateOf(false) }
 
-    // 💡 优化：当全局数据刷新时，通过名称同步更新本地选中的引用，防止实例过期导致状态丢失
-    LaunchedEffect(channelGroupList) {
-        if (focusedChannelGroup != ClassicPanelScreenFavoriteChannelGroup) {
-            channelGroupList.find { it.name == focusedChannelGroup.name }?.let { newGroup ->
-                focusedChannelGroup = newGroup
-                
-                // 同时同步当前选中的频道实例
-                newGroup.channelList.find { c -> c.name == focusedChannel.name }?.let { newChannel ->
-                    focusedChannel = newChannel
-                }
-            }
+    // 💡 数据刷新/过滤变化时，通过名称同步本地选中的分组与频道实例，防止引用过期。
+    // 若原分组已不存在（被过滤掉或换源），回退到第一个非空分组，避免频道列变空。
+    LaunchedEffect(channelGroupList, favoriteGroupVisible) {
+        if (focusedChannelGroup == ClassicPanelScreenFavoriteChannelGroup) {
+            if (!favoriteGroupVisible) focusedChannelGroup = initialChannelGroup
+            return@LaunchedEffect
         }
+
+        val newGroup = channelGroupList
+            .find { it.name == focusedChannelGroup.name && it.channelList.isNotEmpty() }
+            ?: channelGroupList.firstOrNull { it.channelList.isNotEmpty() }
+            ?: initialChannelGroup
+
+        focusedChannelGroup = newGroup
+        newGroup.channelList.find { c -> c.name == focusedChannel.name }
+            ?.let { newChannel -> focusedChannel = newChannel }
+    }
+
+    // 兜底：选中分组内没有任何频道时（如收藏被全部取消），回退到第一个非空分组，
+    // 保证频道列始终有内容、且有可聚焦项，方向键不会失效
+    val currentChannelList = remember(focusedChannelGroup, favoriteChannelList, channelGroupList) {
+        val list = if (focusedChannelGroup == ClassicPanelScreenFavoriteChannelGroup)
+            favoriteChannelList
+        else
+            focusedChannelGroup.channelList
+
+        list.takeIf { it.isNotEmpty() }
+            ?: channelGroupList.firstOrNull { it.channelList.isNotEmpty() }?.channelList
+            ?: list
     }
 
     var groupWidth by remember { mutableIntStateOf(0) }
@@ -144,13 +164,7 @@ fun ClassicChannelScreen(
             ClassicChannelGroupItemList(
                 modifier = Modifier.onSizeChanged { groupWidth = it.width },
                 channelGroupListProvider = { displayedChannelGroupList },
-                initialChannelGroupProvider = {
-                    if (channelFavoriteListVisible)
-                        ClassicPanelScreenFavoriteChannelGroup
-                    else
-                        channelGroupList.find { it.channelList.contains(currentChannelProvider()) }
-                            ?: ChannelGroup()
-                },
+                initialChannelGroupProvider = { initialChannelGroup },
                 onChannelGroupFocused = {
                     focusedChannelGroup = it
                     onChannelFavoriteListVisibleChange(it == ClassicPanelScreenFavoriteChannelGroup)
@@ -175,12 +189,7 @@ fun ClassicChannelScreen(
                         }
                     },
                 channelGroupProvider = { focusedChannelGroup },
-                channelListProvider = {
-                    if (focusedChannelGroup == ClassicPanelScreenFavoriteChannelGroup)
-                        favoriteChannelListProvider()
-                    else
-                        focusedChannelGroup.channelList
-                },
+                channelListProvider = { currentChannelList },
                 epgListProvider = epgListProvider,
                 initialChannelProvider = currentChannelProvider,
                 onChannelSelected = onChannelSelected,

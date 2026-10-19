@@ -23,7 +23,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -86,16 +85,17 @@ fun ClassicChannelItemList(
     val itemFocusRequesterList =
         remember(channelList) { List(channelList.size) { FocusRequester() } }
 
-    var hasFocused by rememberSaveable {
-        mutableStateOf(!channelList.any { it.name == initialChannel.name })
+    // 仅在当前面板会话内有效（面板关闭后随组合销毁重置），
+    // 避免上一次打开留下的状态导致本次打开不自动聚焦
+    var hasFocused by remember {
+        mutableStateOf(channelList.none { it.name == initialChannel.name })
     }
+    // 始终收敛到列表内真实存在的频道，保证焦点恢复时 indexOf 不会得到 -1
     var focusedChannel by remember(channelList) {
         mutableStateOf(
-            if (hasFocused) {
-                channelList.firstOrNull() ?: Channel()
-            } else {
-                channelList.find { it.name == initialChannel.name } ?: initialChannel
-            }
+            channelList.find { it.name == initialChannel.name }
+                ?: channelList.firstOrNull()
+                ?: Channel()
         )
     }
 
@@ -151,7 +151,7 @@ fun ClassicChannelItemList(
         itemsIndexed(channelList, key = { index, channel -> channel.name + channel.urlList.firstOrNull() + index }) { index, channel ->
             val isSelected by remember { derivedStateOf { channel == focusedChannel } }
             val initialFocused by remember {
-                derivedStateOf { !hasFocused && channel == initialChannel }
+                derivedStateOf { !hasFocused && channel.name == initialChannel.name }
             }
 
             ClassicChannelItem(

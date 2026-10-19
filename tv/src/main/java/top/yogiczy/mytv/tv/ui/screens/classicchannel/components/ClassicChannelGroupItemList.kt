@@ -39,7 +39,6 @@ import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.tv.ui.material.rememberDebounceState
 import top.yogiczy.mytv.tv.ui.screens.settings.LocalSettings
 import top.yogiczy.mytv.tv.ui.theme.MyTVTheme
-import top.yogiczy.mytv.tv.ui.utils.focusOnLaunchedSaveable
 import top.yogiczy.mytv.tv.ui.utils.handleKeyEvents
 import top.yogiczy.mytv.tv.ui.utils.ifElse
 import top.yogiczy.mytv.tv.ui.utils.saveFocusRestorer
@@ -57,8 +56,12 @@ fun ClassicChannelGroupItemList(
 ) {
     val channelGroupList = channelGroupListProvider()
     val initialChannelGroup = initialChannelGroupProvider()
-    val itemFocusRequesterList = List(channelGroupList.size) { FocusRequester() }
+    val itemFocusRequesterList =
+        remember(channelGroupList) { List(channelGroupList.size) { FocusRequester() } }
 
+    // 仅在当前面板会话内有效：每次打开都重新聚焦到初始分组，
+    // 同时避免列表滚动导致分组项重新插入时被再次抢焦点
+    var hasFocused by remember { mutableStateOf(false) }
     var focusedChannelGroup by remember { mutableStateOf(initialChannelGroup) }
 
     val listState = remember(channelGroupList) {
@@ -109,10 +112,12 @@ fun ClassicChannelGroupItemList(
     ) {
         itemsIndexed(channelGroupList, key = { index, group -> group.name + index }) { index, channelGroup ->
             val isSelected by remember { derivedStateOf { channelGroup == focusedChannelGroup } }
+            val initialFocused by remember {
+                derivedStateOf { !hasFocused && channelGroup == initialChannelGroup }
+            }
 
             ClassicChannelGroupItem(
                 modifier = Modifier
-                    .ifElse(channelGroup == initialChannelGroup, Modifier.focusOnLaunchedSaveable())
                     .focusRequester(itemFocusRequesterList[index])
                     .ifElse(
                         index == 0,
@@ -128,6 +133,8 @@ fun ClassicChannelGroupItemList(
                     ),
                 channelGroupProvider = { channelGroup },
                 isSelectedProvider = { isSelected },
+                initialFocusedProvider = { initialFocused },
+                onInitialFocused = { hasFocused = true },
                 onFocused = {
                     focusedChannelGroup = channelGroup
                     onChannelGroupFocusedDebounce.send()
@@ -142,12 +149,21 @@ private fun ClassicChannelGroupItem(
     modifier: Modifier = Modifier,
     channelGroupProvider: () -> ChannelGroup = { ChannelGroup() },
     isSelectedProvider: () -> Boolean = { false },
+    initialFocusedProvider: () -> Boolean = { false },
+    onInitialFocused: () -> Unit = {},
     onFocused: () -> Unit = {},
 ) {
     val channelGroup = channelGroupProvider()
 
     val focusRequester = remember { FocusRequester() }
     var isFocused by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (initialFocusedProvider()) {
+            onInitialFocused()
+            focusRequester.saveRequestFocus()
+        }
+    }
 
     DenseListItem(
         modifier = modifier

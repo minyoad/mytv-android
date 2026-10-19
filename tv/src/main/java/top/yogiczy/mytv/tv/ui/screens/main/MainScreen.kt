@@ -95,7 +95,7 @@ fun MainScreen(
                 val hiddenList = settingsViewModel.iptvChannelGroupHiddenList
                 val provinceFilterEnable = settingsViewModel.iptvProvinceFilterEnable
                 val province = settingsViewModel.iptvProvinceCurrent
-                ChannelGroupList(
+                val filtered = ChannelGroupList(
                     s.channelGroupList.filter { group ->
                         if (group.name in hiddenList) return@filter false
                         if (provinceFilterEnable && province.isNotBlank()) {
@@ -104,6 +104,10 @@ fun MainScreen(
                         } else true
                     }
                 )
+
+                // 过滤条件过严（或省份异步解析完成导致分组被裁掉）时不应得到空列表，
+                // 否则整个界面没有频道可用、经典选台也无法聚焦，回退展示全部分组
+                filtered.ifEmpty { s.channelGroupList }
             },
             epgListProvider = { s.epgList },
             onBackPressed = onBackPressed,
