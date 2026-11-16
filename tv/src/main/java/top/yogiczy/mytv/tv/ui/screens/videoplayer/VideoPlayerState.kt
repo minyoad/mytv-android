@@ -31,8 +31,12 @@ class VideoPlayerState(
     var currentUrl: String? = null
         private set
 
-    private var currentSurface: Any? = null
-    private var currentTexture: Any? = null
+    private sealed interface RenderTarget {
+        data class Surface(val view: SurfaceView) : RenderTarget
+        data class Texture(val view: TextureView) : RenderTarget
+    }
+
+    private var renderTarget: RenderTarget? = null
 
     /** 显示模式 */
     var displayMode by mutableStateOf(defaultDisplayModeProvider())
@@ -84,12 +88,12 @@ class VideoPlayerState(
     }
 
     fun setVideoSurfaceView(surfaceView: SurfaceView) {
-        currentSurface = surfaceView
+        renderTarget = RenderTarget.Surface(surfaceView)
         instance.setVideoSurfaceView(surfaceView)
     }
 
     fun setVideoTextureView(textureView: TextureView) {
-        currentTexture = textureView
+        renderTarget = RenderTarget.Texture(textureView)
         instance.setVideoTextureView(textureView)
     }
 
@@ -142,17 +146,18 @@ class VideoPlayerState(
                 // 创建新实例
                 instance = newInstance
                 initialize()
+
+                // 在准备播放前，将最后绑定的视图交给新内核。
+                when (val target = renderTarget) {
+                    is RenderTarget.Surface -> instance.setVideoSurfaceView(target.view)
+                    is RenderTarget.Texture -> instance.setVideoTextureView(target.view)
+                    null -> Unit
+                }
                 
                 // 恢复播放状态
                 prepare(url)
                 seekTo(position)
                 if (wasPlaying) play()
-                
-                // 恢复surface
-                when (currentSurface) {
-                    is SurfaceView -> setVideoSurfaceView(currentSurface as SurfaceView)
-                    is TextureView -> setVideoTextureView(currentTexture as TextureView)
-                }
             }
         }
         instance.onError { ex ->
@@ -183,6 +188,8 @@ class VideoPlayerState(
     fun release() {
         onReadyListeners.clear()
         onErrorListeners.clear()
+        onInterruptListeners.clear()
+        renderTarget = null
         instance.release()
     }
 }

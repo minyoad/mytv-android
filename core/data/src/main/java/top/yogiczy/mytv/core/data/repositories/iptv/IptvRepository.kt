@@ -60,18 +60,18 @@ class IptvRepository(
         }.build()
 
         try {
-            val response = client.newCall(request).await()
+            client.newCall(request).await().use { response ->
+                if (response.code == 304) {
+                    log.i("直播源内容未变动 (304 Not Modified): $source")
+                    return null
+                }
 
-            if (response.code == 304) {
-                log.i("直播源内容未变动 (304 Not Modified): $source")
-                return null
-            }
+                if (!response.isSuccessful) throw Exception("${response.code}: ${response.message}")
 
-            if (!response.isSuccessful) throw Exception("${response.code}: ${response.message}")
-
-            etag = response.header("ETag") ?: ""
-            return withContext(Dispatchers.IO) {
-                response.body?.string() ?: ""
+                etag = response.header("ETag") ?: ""
+                return withContext(Dispatchers.IO) {
+                    response.body?.string() ?: ""
+                }
             }
         } catch (ex: Exception) {
             log.e("获取直播源失败", ex)

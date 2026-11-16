@@ -42,15 +42,15 @@ object Downloader {
 
             var expectedLength = -1L
             try {
-                with(client.newCall(request).execute()) {
-                    if (!isSuccessful) throw Exception("下载文件失败: HTTP $code")
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw Exception("下载文件失败: HTTP ${response.code}")
 
-                    expectedLength = body!!.contentLength()
+                    expectedLength = response.body!!.contentLength()
 
                     // 流式写盘：使用 byteStream + 8KB chunk 写入到 FileOutputStream。
                     // 避免 body.bytes() 全量加载到内存（TV 设备内存仅 1~2GB，
                     // 50~80MB APK 全量加载易 OOM，导致 catch 后用户感知为"下载失败"）。
-                    body!!.byteStream().use { input ->
+                    response.body!!.byteStream().use { input ->
                         file.outputStream().use { output ->
                             val buf = ByteArray(8 * 1024)
                             while (true) {

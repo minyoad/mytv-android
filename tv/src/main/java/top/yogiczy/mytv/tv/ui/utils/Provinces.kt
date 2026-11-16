@@ -26,15 +26,16 @@ object Provinces {
     /** 根据当前IP解析省份 */
     suspend fun resolveCurrentProvince(): String? = withContext(Dispatchers.IO) {
         try {
-            val response = OkHttp.client.newCall(
+            OkHttp.client.newCall(
                 Request.Builder()
                     .url("https://ip.mybacc.com/query")
                     .header("User-Agent", "Mozilla/5.0")
                     .build()
-            ).await()
-            if (!response.isSuccessful) return@withContext null
-            val json = JSONObject(response.body?.string().orEmpty())
-            normalizeProvince(json.optString("province"))
+            ).await().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val json = JSONObject(response.body?.string().orEmpty())
+                normalizeProvince(json.optString("province"))
+            }
         } catch (ex: Exception) {
             log.e("IP归属地解析失败", ex)
             null

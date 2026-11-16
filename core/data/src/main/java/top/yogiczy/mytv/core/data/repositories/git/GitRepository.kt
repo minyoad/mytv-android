@@ -24,13 +24,13 @@ class GitRepository : Loggable() {
         val request = Request.Builder().url(url).build()
 
         try {
-            val response = client.newCall(request).await()
+            client.newCall(request).await().use { response ->
+                if (!response.isSuccessful) throw Exception("${response.code}: ${response.message}")
 
-            if (!response.isSuccessful) throw Exception("${response.code}: ${response.message}")
-
-            val parser = GitReleaseParser.instances.first { it.isSupport(url) }
-            return withContext(Dispatchers.IO) {
-                parser.parse(response.body!!.string())
+                val parser = GitReleaseParser.instances.first { it.isSupport(url) }
+                return withContext(Dispatchers.IO) {
+                    parser.parse(response.body!!.string())
+                }
             }
         } catch (ex: Exception) {
             log.e("获取最新发行版失败", ex)
