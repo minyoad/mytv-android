@@ -8,6 +8,9 @@ import coil.imageLoader
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +22,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -28,6 +30,7 @@ import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.ch
 import top.yogiczy.mytv.core.data.entities.channel.ChannelList
 import top.yogiczy.mytv.core.data.entities.epg.EpgList
 import top.yogiczy.mytv.core.data.entities.epgsource.EpgSource
+import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSource
 import top.yogiczy.mytv.core.data.repositories.epg.EpgRepository
 import top.yogiczy.mytv.core.data.repositories.iptv.IptvRepository
 import top.yogiczy.mytv.core.data.repositories.iptv.IptvsProbeService
@@ -47,9 +50,11 @@ class MainViewModel(
     private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Loading())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
-    // 最近一次成功拉取 EPG 的时间戳（毫秒）
-    // 用于 onAppResume 判断是否跨日，以及 invalidateEpg 后重置
-    private var lastEpgUpdateTimestamp: Long = 0
+    private val channelRefreshMutex = Mutex()
+    private val epgRefreshMutex = Mutex()
+    private var initializationJob: Job? = null
+    private var generation = 0L
+    private var channelListSource: IptvSource? = null
 
     // 最近一次成功加载的频道列表缓存，用于 EPG 刷新兜底
     private var lastKnownChannelGroupList: ChannelGroupList? = null
@@ -64,7 +69,13 @@ class MainViewModel(
     }
 
     fun init() {
-        viewModelScope.launch {
+        generation++
+        val requestGeneration = generation
+        val source = Configs.iptvSourceCurrent
+        initializationJob?.cancel()
+        lastKnownChannelGroupList = null
+        channelListSource = null
+        initializationJob = viewModelScope.launch {
             _uiState.value = MainUiState.Loading()
 
             // 1. 尝试并行加载混合模式配置
@@ -75,10 +86,13 @@ class MainViewModel(
             }
 
             // 2. 尝试从缓存快速恢复频道列表
-            val cachedChannelGroupList = IptvRepository(Configs.iptvSourceCurrent).getCachedChannelGroupList()
+            val cachedChannelGroupList = IptvRepository(source).getCachedChannelGroupList()
+            if (generation != requestGeneration || Configs.iptvSourceCurrent != source) return@launch
             if (cachedChannelGroupList != null) {
                 log.i("从缓存中快速恢复频道列表")
                 val hydrated = hybridChannel(cachedChannelGroupList)
+                if (generation != requestGeneration || Configs.iptvSourceCurrent != source) return@launch
+                channelListSource = source
                 lastKnownChannelGroupList = hydrated  // 立即缓存，供后续 EPG 兜底使用
                 _uiState.value = MainUiState.Ready(channelGroupList = hydrated)
 
@@ -115,46 +129,12 @@ class MainViewModel(
         }
     }
 
-    /**
-     * 应用从后台回到前台时，按需刷新 EPG。
-     *
-     * 触发条件（任一满足即刷新）：
-     * 1. **跨日**：本地 EPG 是前一天的数据（EPG 服务器通常一天更新一次，无意义高频刷新）
-     * 2. **本地没有 EPG**：从未成功拉取过，或当前 epgList 为空（用户清缓存、缓存被系统清理等场景）
-     *
-     * 这两个条件之外（本地有 EPG 且仍在同一天），不触发刷新。
-     */
+    /** Repository policy decides whether the daily refresh boundary has been reached. */
     fun onAppResume() {
-        viewModelScope.launch {
-            val currentDate = LocalDate.now()
-            val lastUpdateDate = lastEpgUpdateTimestamp.takeIf { it != 0L }
-                ?.let {
-                    java.time.Instant.ofEpochMilli(it)
-                        .atZone(java.time.ZoneId.systemDefault())
-                        .toLocalDate()
-                }
-
-            // 条件 1: 跨日 → 刷新
-            val isDateChanged = lastUpdateDate != null && lastUpdateDate != currentDate
-
-            // 条件 2: 本地没 EPG → 刷新
-            // - 从未成功拉过（lastEpgUpdateTimestamp == 0L）
-            // - 或当前 uiState.epgList 为空（拉到但无数据，或被清空）
-            val hasNoEpg = lastEpgUpdateTimestamp == 0L ||
-                (_uiState.value as? MainUiState.Ready)?.epgList?.isEmpty() == true
-
-            if (isDateChanged || hasNoEpg) {
-                refreshEpg()
-            }
-        }
+        viewModelScope.launch { refreshEpg() }
     }
 
-    /**
-     * 标记 EPG 缓存已失效并立即重新拉取。
-     * 供外部模块（如 SettingsViewModel.clearCache）通过 notifyEpgCacheInvalidated() 触发。
-     */
     private fun invalidateEpg() {
-        lastEpgUpdateTimestamp = 0L
         viewModelScope.launch { refreshEpg() }
     }
 
@@ -171,9 +151,9 @@ class MainViewModel(
         viewModelScope.launch {
             while (true) {
                 delay(Constants.IPTV_SOURCE_CHECK_INTERVAL)
-                val changed = runCatching { refreshChannel(showLoading = false) }.getOrDefault(false)
-                // 频道列表变化后，节目单所依赖的频道名可能随之变化，需同步刷新
-                if (changed) refreshEpg()
+                refreshChannel(showLoading = false)
+                // Also refresh after the daily EPG boundary while the TV stays in the foreground.
+                refreshEpg()
             }
         }
     }
@@ -212,15 +192,18 @@ class MainViewModel(
      *
      * @return 频道列表是否发生变化（false 表示与上次一致、列表为空或拉取失败）
      */
-    private suspend fun refreshChannel(showLoading: Boolean = true): Boolean {
+    private suspend fun refreshChannel(showLoading: Boolean = true): Boolean = channelRefreshMutex.withLock {
+        val source = Configs.iptvSourceCurrent
+        val requestGeneration = generation
+        fun isCurrent() = source == Configs.iptvSourceCurrent && requestGeneration == generation
         var changed = false
 
         flow {
-            val iptvRepository = IptvRepository(Configs.iptvSourceCurrent)
+            val iptvRepository = IptvRepository(source)
             emit(iptvRepository.getChannelGroupList(cacheTime = Configs.iptvSourceCacheTime))
         }
             .retryWhen { _, attempt ->
-                if (attempt >= Constants.HTTP_RETRY_COUNT) return@retryWhen false
+                if (!isCurrent() || attempt >= Constants.HTTP_RETRY_COUNT) return@retryWhen false
 
                 // 只在首次重试时切换 UI 状态，避免反复重组整个主屏幕导致按键排队卡顿
                 if (showLoading && attempt == 0L) {
@@ -231,6 +214,7 @@ class MainViewModel(
                 true
             }
             .catch {
+                if (!isCurrent()) return@catch
                 if (showLoading || _uiState.value !is MainUiState.Ready) {
                     _uiState.value = MainUiState.Error(it.message)
                 } else {
@@ -239,6 +223,7 @@ class MainViewModel(
             }
             .map { hybridChannel(it) }
             .map {
+                if (!isCurrent()) return@map it
                 // 只有当数据真的变化时才更新 UI，避免冗余刷新
                 val currentState = _uiState.value
                 val isPopulated = it.channelList.isNotEmpty()
@@ -246,6 +231,7 @@ class MainViewModel(
                 if (isPopulated) {
                     // 缓存最近一次成功的频道列表，用于 refreshEpg 兜底（避免 UI 进 Error 后 EPG 永久不刷新）
                     lastKnownChannelGroupList = it
+                    channelListSource = source
                 }
 
                 if (currentState !is MainUiState.Ready || (isPopulated && currentState.channelGroupList != it)) {
@@ -266,7 +252,7 @@ class MainViewModel(
             }
             .collect()
 
-        return changed
+        changed
     }
 
     private suspend fun hybridChannel(channelGroupList: ChannelGroupList) =
@@ -306,64 +292,59 @@ class MainViewModel(
             }
         }
 
-    private suspend fun refreshEpg() {
-        if (!Configs.epgEnable) return
-
-        // 优先使用入参 channelGroupList（来自 init），其次用最近一次成功的列表，最后才从 uiState 取
-        val channelGroupList = when {
-            _uiState.value is MainUiState.Ready -> (_uiState.value as MainUiState.Ready).channelGroupList
-            else -> lastKnownChannelGroupList
-        } ?: return
-
-        if (channelGroupList.channelList.isEmpty()) return
-
-        EpgList.clearCache()
+    private suspend fun refreshEpg() = epgRefreshMutex.withLock {
+        if (!Configs.epgEnable) return@withLock
+        val iptvSource = Configs.iptvSourceCurrent
+        if (channelListSource != iptvSource) return@withLock
+        val requestGeneration = generation
+        val channelGroupList = (_uiState.value as? MainUiState.Ready)?.channelGroupList
+            ?: lastKnownChannelGroupList ?: return@withLock
+        if (channelGroupList.channelList.isEmpty()) return@withLock
+        val configuredEpgSource = Configs.epgSourceCurrent
+        val epgSource = channelGroupList.epgUrl?.takeIf { it.isNotBlank() }?.let {
+            EpgSource(name = "直播源自带", url = it)
+        } ?: configuredEpgSource
+        val threshold = Configs.epgRefreshTimeThreshold
+        fun isCurrent(): Boolean = requestGeneration == generation && Configs.epgEnable &&
+            Configs.iptvSourceCurrent == iptvSource && Configs.epgSourceCurrent == configuredEpgSource &&
+            Configs.epgRefreshTimeThreshold == threshold && lastKnownChannelGroupList == channelGroupList
 
         flow {
-            val epgUrl = channelGroupList.epgUrl
-            val epgSource = if (!epgUrl.isNullOrBlank()) {
-                log.i("优先使用直播源自带节目单: $epgUrl")
-                EpgSource(name = "直播源自带", url = epgUrl)
-            } else {
-                log.i("使用系统设置节目单: ${Configs.epgSourceCurrent.url}")
-                Configs.epgSourceCurrent
-            }
-
-            emit(
-                EpgRepository(epgSource).getEpgList(
-                    filteredChannels = channelGroupList.channelList.map { it.epgName },
-                    refreshTimeThreshold = Configs.epgRefreshTimeThreshold,
-                )
-            )
+            emit(EpgRepository(epgSource).getEpgList(
+                filteredChannels = channelGroupList.channelList.map { it.epgName },
+                refreshTimeThreshold = threshold,
+            ))
         }
-            .retry(Constants.HTTP_RETRY_COUNT) { delay(Constants.HTTP_RETRY_INTERVAL); true }
-            .catch {
-                emit(EpgList())
-                Snackbar.show("节目单获取失败，请检查网络连接", type = SnackbarType.ERROR)
+            .retryWhen { _, attempt ->
+                if (!isCurrent() || attempt >= Constants.HTTP_RETRY_COUNT) false
+                else { delay(Constants.HTTP_RETRY_INTERVAL); true }
             }
-            .map { epgList ->
-                // Record current timestamp when EPG is successfully updated
-                lastEpgUpdateTimestamp = System.currentTimeMillis()
-                // 即使 uiState 不是 Ready（如 Error），也用最新的 channelGroupList 升级到 Ready
-                val current = _uiState.value
-                _uiState.value = if (current is MainUiState.Ready) {
-                    current.copy(epgList = epgList)
-                } else {
-                    MainUiState.Ready(channelGroupList = channelGroupList, epgList = epgList)
+            .catch {
+                if (isCurrent()) {
+                    // Keep the displayed EPG on failure. Never turn an exception into empty success.
+                    log.e("节目单刷新失败，保留当前节目单", it)
+                    Snackbar.show("节目单刷新失败，已保留原有数据", type = SnackbarType.ERROR)
                 }
             }
-            .collect()
+            .collect { result ->
+                if (!isCurrent()) return@collect
+                val current = _uiState.value as? MainUiState.Ready ?: return@collect
+                result.refreshError?.let { log.w("节目单刷新失败，使用已验证的过期缓存", it) }
+                if (result.refreshError != null && current.epgList.isNotEmpty()) return@collect
+                EpgList.clearCache()
+                _uiState.value = current.copy(epgList = result.value)
+            }
     }
 
     companion object {
         // 进程级 SharedFlow：用于跨 ViewModel 通信。
         // 当前用途：SettingsViewModel.clearCache() 后通知 MainViewModel EPG 缓存失效。
-        // extraBufferCapacity = 1 保证 emit 不会因暂无订阅者而丢失（最多缓存一个事件）。
-        private val EPG_CACHE_INVALIDATE_SIGNAL = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        // Retain the invalidation until a ViewModel subscribes.
+        private val EPG_CACHE_INVALIDATE_SIGNAL = MutableSharedFlow<Unit>(replay = 1)
 
         /**
          * 通知 EPG 缓存已失效。供外部模块（如清缓存）调用，
-         * MainViewModel 监听后会重置时间戳并立即重新拉取 EPG。
+         * MainViewModel 监听后会重新读取缓存并按需拉取 EPG。
          */
         fun notifyEpgCacheInvalidated() {
             EPG_CACHE_INVALIDATE_SIGNAL.tryEmit(Unit)

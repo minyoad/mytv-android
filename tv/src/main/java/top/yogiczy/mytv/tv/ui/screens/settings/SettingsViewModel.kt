@@ -20,6 +20,7 @@ import top.yogiczy.mytv.core.data.entities.epgsource.EpgSourceList
 import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSource
 import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSourceList
 import top.yogiczy.mytv.core.data.utils.Globals
+import top.yogiczy.mytv.core.data.repositories.ValidatedFileCache
 import top.yogiczy.mytv.tv.ui.material.Snackbar
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.VideoPlayerDisplayMode
 import top.yogiczy.mytv.tv.ui.utils.Configs
@@ -458,8 +459,9 @@ class SettingsViewModel : ViewModel() {
             withContext(Dispatchers.IO) {
                 // 清理所有直播源和节目单文件缓存
                 Globals.cacheDir.listFiles()?.forEach { file ->
-                    if (file.name.startsWith("iptv-") || file.name.startsWith("epg-")) {
-                        file.delete()
+                    if ((file.name.startsWith("iptv-") && file.name.endsWith(".txt")) ||
+                        (file.name.startsWith("epg-") && file.name.endsWith(".xml"))) {
+                        ValidatedFileCache(file).clear()
                     }
                 }
                 

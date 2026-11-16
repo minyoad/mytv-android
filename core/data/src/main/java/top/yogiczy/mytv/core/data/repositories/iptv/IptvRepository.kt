@@ -1,5 +1,6 @@
 package top.yogiczy.mytv.core.data.repositories.iptv
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -8,11 +9,14 @@ import top.yogiczy.mytv.core.data.entities.channel.ChannelList
 import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSource
 import top.yogiczy.mytv.core.data.network.OkHttp
 import top.yogiczy.mytv.core.data.network.await
-import top.yogiczy.mytv.core.data.repositories.FileCacheRepository
+import top.yogiczy.mytv.core.data.repositories.ValidatedFileCache
+import top.yogiczy.mytv.core.data.repositories.iptv.parser.DefaultIptvParser
 import top.yogiczy.mytv.core.data.repositories.iptv.parser.IptvParser
 import top.yogiczy.mytv.core.data.utils.Logger
-import top.yogiczy.mytv.core.data.utils.SP
+import top.yogiczy.mytv.core.data.utils.Globals
 import top.yogiczy.mytv.core.util.utils.removeBom
+import java.io.File
+import java.io.IOException
 
 
 class IdGenerator {
@@ -32,29 +36,22 @@ class IdGenerator {
  */
 class IptvRepository(
     private val source: IptvSource,
-) : FileCacheRepository(
-    if (source.isLocal) source.url
-    else "iptv-${source.url.hashCode().toUInt().toString(16)}.txt",
-    source.isLocal,
 ) {
     private val log = Logger.create(IptvRepository::class.java.simpleName)
 
-    private val idGenerator = IdGenerator()
-
-    private val etagKey = "iptv_etag_${source.url.hashCode().toUInt().toString(16)}"
-    private var etag: String
-        get() = SP.getString(etagKey, "")
-        set(value) = SP.putString(etagKey, value)
+    private val file = if (source.isLocal) File(source.url)
+        else File(Globals.cacheDir, "iptv-${source.url.hashCode().toUInt().toString(16)}.txt")
+    private val cache = ValidatedFileCache(file)
 
     /**
      * 获取直播源数据
      */
-    private suspend fun fetchSource(sourceUrl: String): String? {
+    private suspend fun fetchSource(temporary: File, etag: String?): ValidatedFileCache.Download {
         log.d("获取远程直播源: $source")
 
         val client = OkHttp.client
-        val request = Request.Builder().url(sourceUrl).apply {
-            if (etag.isNotEmpty() && getCacheFile().exists()) {
+        val request = Request.Builder().url(source.url).apply {
+            if (!etag.isNullOrEmpty()) {
                 header("If-None-Match", etag)
             }
         }.build()
@@ -63,16 +60,18 @@ class IptvRepository(
             client.newCall(request).await().use { response ->
                 if (response.code == 304) {
                     log.i("直播源内容未变动 (304 Not Modified): $source")
-                    return null
+                    return ValidatedFileCache.Download.NotModified
                 }
 
                 if (!response.isSuccessful) throw Exception("${response.code}: ${response.message}")
 
-                etag = response.header("ETag") ?: ""
                 return withContext(Dispatchers.IO) {
-                    response.body?.string() ?: ""
+                    temporary.writeText(response.body?.string() ?: throw IOException("直播源响应体为空"))
+                    ValidatedFileCache.Download.Modified(response.header("ETag"))
                 }
             }
+        } catch (ex: CancellationException) {
+            throw ex
         } catch (ex: Exception) {
             log.e("获取直播源失败", ex)
             throw Exception("获取直播源失败，请检查网络连接", ex)
@@ -84,10 +83,17 @@ class IptvRepository(
      */
     suspend fun getChannelGroupList(cacheTime: Long): ChannelGroupList {
         try {
-            val rawData = getOrRefresh(if (source.isLocal) Long.MAX_VALUE else cacheTime) {
-                fetchSource(source.url)
-            }
-            return parseData(rawData)
+            if (source.isLocal) return cache.read { parseData(it.readText()) }
+                ?: throw IOException("本地直播源不存在")
+            val result = cache.load(
+                isExpired = { System.currentTimeMillis() - it >= cacheTime },
+                validate = { parseData(it.readText()) },
+                download = ::fetchSource,
+            )
+            result.refreshError?.let { log.w("刷新失败，保留直播源缓存", it) }
+            return result.value
+        } catch (ex: CancellationException) {
+            throw ex
         } catch (ex: Exception) {
             log.e("获取直播源失败", ex)
             throw Exception(ex)
@@ -100,8 +106,10 @@ class IptvRepository(
     suspend fun getCachedChannelGroupList(): ChannelGroupList? {
         return try {
             withContext(Dispatchers.IO) {
-                getCacheData()?.let { parseData(it) }
+                cache.read { parseData(it.readText()) }
             }
+        } catch (ex: CancellationException) {
+            throw ex
         } catch (ex: Exception) {
             null
         }
@@ -111,12 +119,17 @@ class IptvRepository(
         return withContext(Dispatchers.IO) {
             val sourceData = rawData.removeBom()
 
-            val parser = IptvParser.instances.first { it.isSupport(source.url, sourceData) }
+            val parser = IptvParser.instances.firstOrNull {
+                it !is DefaultIptvParser && it.isSupport(source.url, sourceData)
+            } ?: throw IOException("不支持当前直播源格式")
             val startTime = System.currentTimeMillis()
             val groupList = parser.parse(sourceData)
+            if (groupList.none { group -> group.channelList.any { channel -> channel.urlList.any(String::isNotBlank) } }) {
+                throw IOException("直播源没有可用频道")
+            }
 
             // 在获取到频道列表后，统一生成数字序号 ID
-            idGenerator.reset()
+            val idGenerator = IdGenerator()
             val groupListWithIds = ChannelGroupList(
                 value = groupList.map { group ->
                     group.copy(channelList = ChannelList(group.channelList.map { channel ->
@@ -139,8 +152,8 @@ class IptvRepository(
         }
     }
 
-    override suspend fun clearCache() {
+    suspend fun clearCache() {
         if (source.isLocal) return
-        super.clearCache()
+        cache.clear()
     }
 }

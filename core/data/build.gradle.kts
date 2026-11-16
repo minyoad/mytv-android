@@ -52,6 +52,7 @@ dependencies {
     implementation(project(":core:util"))
 
     testImplementation(libs.junit)
+    testImplementation("net.sf.kxml:kxml2:2.3.0")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }
