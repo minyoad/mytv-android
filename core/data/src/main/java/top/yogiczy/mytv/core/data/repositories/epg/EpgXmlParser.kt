@@ -44,10 +44,14 @@ internal object EpgXmlParser {
                 }
                 "programme" -> {
                     val id = parser.getAttributeValue(null, "channel")
+                    if (id == null || id !in names) {
+                        readChildText(parser, "")
+                        continue
+                    }
                     val start = parseDate(parser.getAttributeValue(null, "start"))
                     val end = parseDate(parser.getAttributeValue(null, "stop"))
                     val title = readChildText(parser, "title")
-                    if (id != null && id in names && start != null && end != null && end > start && title.isNotBlank()) {
+                    if (start != null && end != null && end > start && title.isNotBlank()) {
                         programmes.getOrPut(id) { mutableListOf() }.add(EpgProgramme(startAt = start, endAt = end, title = title))
                     }
                 }

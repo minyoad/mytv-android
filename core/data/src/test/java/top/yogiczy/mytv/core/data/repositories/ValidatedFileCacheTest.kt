@@ -226,4 +226,46 @@ class ValidatedFileCacheTest {
             assertFalse(File(file.path + ".etag").exists())
         }
     }
+
+    @Test fun expiredCacheIsPublishedBeforeSlowNetworkRefreshCompletes() = runBlocking<Unit> {
+        withTimeout(5000) {
+            val file = cacheFile()
+            seed(file)
+            val displayed = CompletableDeferred<Int>()
+            val networkStarted = CompletableDeferred<Unit>()
+            val finishNetwork = CompletableDeferred<Unit>()
+            val refresh = async {
+                ValidatedFileCache(file) { 200_000L }.load(
+                    isExpired = { true }, validate = validate,
+                    onCached = { displayed.complete(it.value) },
+                ) { stage, _ ->
+                    assertTrue(displayed.isCompleted)
+                    networkStarted.complete(Unit)
+                    finishNetwork.await()
+                    stage.writeText("2")
+                    ValidatedFileCache.Download.Modified("new")
+                }
+            }
+            assertEquals(1, displayed.await())
+            networkStarted.await()
+            assertFalse(refresh.isCompleted)
+            assertEquals("1", file.readText())
+            finishNetwork.complete(Unit)
+            assertEquals(2, refresh.await().value)
+        }
+    }
+
+    @Test fun invalidLocalCacheIsNeverPublished() = runBlocking<Unit> {
+        val file = cacheFile()
+        file.writeText("broken")
+        var published = false
+        val result = ValidatedFileCache(file).load(
+            isExpired = { true }, validate = validate, onCached = { published = true },
+        ) { stage, _ ->
+            stage.writeText("2")
+            ValidatedFileCache.Download.Modified(null)
+        }
+        assertFalse(published)
+        assertEquals(2, result.value)
+    }
 }

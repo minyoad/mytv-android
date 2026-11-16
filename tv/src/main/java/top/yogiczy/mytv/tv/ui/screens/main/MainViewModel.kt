@@ -5,10 +5,13 @@ import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import coil.imageLoader
-import coil.request.CachePolicy
-import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.delay
@@ -25,6 +28,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.yogiczy.mytv.core.data.entities.channel.Channel
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelList
@@ -38,6 +42,8 @@ import top.yogiczy.mytv.core.data.utils.ChannelUtil
 import top.yogiczy.mytv.core.data.utils.Constants
 import top.yogiczy.mytv.core.data.utils.Logger
 import top.yogiczy.mytv.tv.ui.material.Snackbar
+import top.yogiczy.mytv.tv.ui.screens.channel.components.ChannelLogoRequest
+import top.yogiczy.mytv.tv.ui.screens.channel.components.logoPrefetchUrls
 import top.yogiczy.mytv.tv.ui.material.SnackbarType
 import top.yogiczy.mytv.tv.ui.utils.Configs
 import top.yogiczy.mytv.tv.ui.utils.IJKProbe
@@ -51,7 +57,7 @@ class MainViewModel(
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
     private val channelRefreshMutex = Mutex()
-    private val epgRefreshMutex = Mutex()
+    private val epgTask = LatestTask<EpgRequest>(viewModelScope)
     private var initializationJob: Job? = null
     private var generation = 0L
     private var channelListSource: IptvSource? = null
@@ -73,6 +79,7 @@ class MainViewModel(
         val requestGeneration = generation
         val source = Configs.iptvSourceCurrent
         initializationJob?.cancel()
+        epgTask.cancel()
         lastKnownChannelGroupList = null
         channelListSource = null
         initializationJob = viewModelScope.launch {
@@ -96,46 +103,51 @@ class MainViewModel(
                 lastKnownChannelGroupList = hydrated  // 立即缓存，供后续 EPG 兜底使用
                 _uiState.value = MainUiState.Ready(channelGroupList = hydrated)
 
-                // 缓存恢复后并行拉取最新数据
+                // Local EPG is independent of hybrid config and channel-network refresh.
+                requestEpgRefresh()
                 launch {
-                    hybridJob.join() // 确保混合模式配置加载完再更新频道
-                    refreshChannel(showLoading = false)
-                    refreshEpg()
+                    val changed = refreshChannel(showLoading = false)
+                    if (changed) requestEpgRefresh()
                 }
             } else {
-                // 无缓存时，顺序执行以保证首次加载体验
-                hybridJob.join()
+                // Fetch channels immediately; hybrid configuration must not delay the first list.
                 refreshChannel(showLoading = true)
-                refreshEpg()
+                requestEpgRefresh()
+            }
+
+            launch {
+                hybridJob.join()
+                if (generation == requestGeneration && Configs.iptvSourceCurrent == source &&
+                    Configs.iptvHybridMode != Configs.IptvHybridMode.DISABLE) {
+                    val changed = refreshChannel(showLoading = false)
+                    if (changed) requestEpgRefresh()
+                }
             }
 
             probeIptvs()
         }
     }
 
-    fun preloadLogos(context: Context, channelGroupList: ChannelGroupList) {
+    suspend fun preloadLogos(context: Context, groups: ChannelGroupList, current: Channel?) {
         if (!Configs.uiShowChannelLogo) return
-
-        viewModelScope.launch(Dispatchers.IO) {
-            channelGroupList.channelList.forEach { channel ->
-                if (!channel.logo.isNullOrBlank()) {
-                    val request = ImageRequest.Builder(context)
-                        .data(channel.logo)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .build()
-                    context.imageLoader.enqueue(request)
+        val loader = context.applicationContext.imageLoader
+        val permits = Semaphore(2)
+        coroutineScope {
+            logoPrefetchUrls(groups, current).map { url ->
+                async {
+                    permits.withPermit { loader.execute(ChannelLogoRequest.create(context.applicationContext, url)) }
                 }
-            }
+            }.awaitAll()
         }
     }
 
     /** Repository policy decides whether the daily refresh boundary has been reached. */
     fun onAppResume() {
-        viewModelScope.launch { refreshEpg() }
+        requestEpgRefresh()
     }
 
     private fun invalidateEpg() {
-        viewModelScope.launch { refreshEpg() }
+        requestEpgRefresh()
     }
 
     /**
@@ -153,7 +165,7 @@ class MainViewModel(
                 delay(Constants.IPTV_SOURCE_CHECK_INTERVAL)
                 refreshChannel(showLoading = false)
                 // Also refresh after the daily EPG boundary while the TV stays in the foreground.
-                refreshEpg()
+                requestEpgRefresh()
             }
         }
     }
@@ -292,29 +304,38 @@ class MainViewModel(
             }
         }
 
-    private suspend fun refreshEpg() = epgRefreshMutex.withLock {
-        if (!Configs.epgEnable) return@withLock
-        val iptvSource = Configs.iptvSourceCurrent
-        if (channelListSource != iptvSource) return@withLock
-        val requestGeneration = generation
-        val channelGroupList = (_uiState.value as? MainUiState.Ready)?.channelGroupList
-            ?: lastKnownChannelGroupList ?: return@withLock
-        if (channelGroupList.channelList.isEmpty()) return@withLock
-        val configuredEpgSource = Configs.epgSourceCurrent
-        val epgSource = channelGroupList.epgUrl?.takeIf { it.isNotBlank() }?.let {
-            EpgSource(name = "直播源自带", url = it)
-        } ?: configuredEpgSource
-        val threshold = Configs.epgRefreshTimeThreshold
-        fun isCurrent(): Boolean = requestGeneration == generation && Configs.epgEnable &&
-            Configs.iptvSourceCurrent == iptvSource && Configs.epgSourceCurrent == configuredEpgSource &&
-            Configs.epgRefreshTimeThreshold == threshold && lastKnownChannelGroupList == channelGroupList
+    private data class EpgRequest(
+        val generation: Long,
+        val iptvSource: IptvSource,
+        val source: EpgSource,
+        val channelNames: Set<String>,
+        val threshold: Int,
+    )
 
-        flow {
-            emit(EpgRepository(epgSource).getEpgList(
-                filteredChannels = channelGroupList.channelList.map { it.epgName },
-                refreshTimeThreshold = threshold,
-            ))
-        }
+    private fun currentEpgRequest(): EpgRequest? {
+        if (!Configs.epgEnable) return null
+        val source = Configs.iptvSourceCurrent
+        if (channelListSource != source) return null
+        val groups = lastKnownChannelGroupList ?: return null
+        if (groups.channelList.isEmpty()) return null
+        val epg = groups.epgUrl?.takeIf { it.isNotBlank() }?.let { EpgSource("直播源自带", it) }
+            ?: Configs.epgSourceCurrent
+        return EpgRequest(generation, source, epg, groups.channelList.map { it.epgName }.toSet(),
+            Configs.epgRefreshTimeThreshold)
+    }
+
+    private fun requestEpgRefresh() {
+        val request = currentEpgRequest() ?: run { epgTask.cancel(); return }
+        epgTask.start(request) { refreshEpg(request) }
+    }
+
+    private suspend fun refreshEpg(request: EpgRequest) {
+        fun isCurrent() = request == currentEpgRequest()
+
+        EpgRepository(request.source).observeEpgList(
+            filteredChannels = request.channelNames.toList(),
+            refreshTimeThreshold = request.threshold,
+        )
             .retryWhen { _, attempt ->
                 if (!isCurrent() || attempt >= Constants.HTTP_RETRY_COUNT) false
                 else { delay(Constants.HTTP_RETRY_INTERVAL); true }

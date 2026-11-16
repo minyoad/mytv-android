@@ -34,6 +34,7 @@ class ValidatedFileCache(private val file: File, private val now: () -> Long = S
     suspend fun <T : Any> load(
         isExpired: (Long) -> Boolean,
         validate: suspend (File) -> T,
+        onCached: suspend (Result<T>) -> Unit = {},
         download: suspend (temporaryFile: File, etag: String?) -> Download,
     ): Result<T> = withContext(Dispatchers.IO) {
         val observedRevision = entry.revision.get()
@@ -48,6 +49,8 @@ class ValidatedFileCache(private val file: File, private val now: () -> Long = S
                 }
             } else null
             val checkedAt = file.lastModified()
+            // Consumers can display a validated local entry before any conditional request or timeout.
+            if (cached != null) onCached(Result(cached, checkedAt))
             // Another caller refreshed this entry while we were waiting for its lock.
             if (entry.revision.get() != observedRevision) {
                 if (cached != null) return@withLock Result(cached, checkedAt, entry.refreshError)

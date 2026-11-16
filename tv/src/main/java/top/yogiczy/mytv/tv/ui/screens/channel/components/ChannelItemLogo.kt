@@ -1,6 +1,5 @@
 package top.yogiczy.mytv.tv.ui.screens.channel.components
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
@@ -21,7 +20,6 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.SubcomposeAsyncImage
-import coil.request.ImageRequest
 import top.yogiczy.mytv.core.data.utils.Logger
 import kotlin.math.abs
 
@@ -34,10 +32,12 @@ fun ChannelItemLogo(
     val log = remember { Logger.create("ChannelItemLogo") }
     val logo = logoProvider()
     val textFallback = textFallbackProvider()
+    val context = LocalContext.current
 
     // 当前加载的 logo URL，加载失败时支持 png/webp 格式间自动回退
     var currentLogo by remember(logo) { mutableStateOf(logo) }
     var formatFallbackTried by remember(logo) { mutableStateOf(false) }
+    val request = remember(context, currentLogo) { ChannelLogoRequest.create(context, currentLogo.orEmpty()) }
 
     Box(
         modifier = modifier
@@ -55,11 +55,7 @@ fun ChannelItemLogo(
         } else {
             SubcomposeAsyncImage(
                 modifier = Modifier.fillMaxSize(),
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(currentLogo)
-                    .allowHardware(false)
-                    .bitmapConfig(Bitmap.Config.ARGB_8888)
-                    .build(),
+                model = request,
                 contentDescription = null,
                 loading = {
                     if (!textFallback.isNullOrBlank()) {

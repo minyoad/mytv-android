@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -70,8 +71,9 @@ fun MainContent(
 ) {
     val context = LocalContext.current
 
+    val latestFilteredChannels by rememberUpdatedState(filteredChannelGroupListProvider)
     val filteredChannelGroupList by remember {
-        derivedStateOf { filteredChannelGroupListProvider() }
+        derivedStateOf { latestFilteredChannels() }
     }
 
     val videoPlayerState =

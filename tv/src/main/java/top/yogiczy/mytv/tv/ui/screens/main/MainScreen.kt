@@ -34,6 +34,7 @@ import androidx.tv.material3.LocalTextStyle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
+import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelList
 import top.yogiczy.mytv.tv.ui.material.CircularProgressIndicator
 import top.yogiczy.mytv.tv.ui.material.Visible
 import top.yogiczy.mytv.tv.ui.rememberChildPadding
@@ -68,10 +69,23 @@ fun MainScreen(
         }
     }
 
-    LaunchedEffect(uiState) {
-        val s = uiState
-        if (s is MainUiState.Ready) {
-            mainViewModel.preloadLogos(context, s.channelGroupList)
+    val ready = uiState as? MainUiState.Ready
+    val sourceGroups = ready?.channelGroupList
+    val visibleGroups = sourceGroups?.let { groups ->
+        val hidden = settingsViewModel.iptvChannelGroupHiddenList
+        val province = settingsViewModel.iptvProvinceCurrent
+        ChannelGroupList(
+            groups.filter { group ->
+                group.name !in hidden && (!settingsViewModel.iptvProvinceFilterEnable || province.isBlank() ||
+                    group.name.contains(province) || !Provinces.isProvinceGroup(group.name))
+            },
+            epgUrl = groups.epgUrl,
+        ).ifEmpty { groups }
+    }
+    val currentChannel = sourceGroups?.channelList?.getOrNull(settingsViewModel.iptvLastChannelIdx)
+    LaunchedEffect(visibleGroups, settingsViewModel.uiShowChannelLogo, currentChannel?.id) {
+        if (visibleGroups != null && settingsViewModel.uiShowChannelLogo) {
+            mainViewModel.preloadLogos(context, visibleGroups, currentChannel)
         }
     }
 
@@ -91,24 +105,7 @@ fun MainScreen(
         is MainUiState.Ready -> MainContent(
             modifier = modifier,
             channelGroupListProvider = { s.channelGroupList },
-            filteredChannelGroupListProvider = {
-                val hiddenList = settingsViewModel.iptvChannelGroupHiddenList
-                val provinceFilterEnable = settingsViewModel.iptvProvinceFilterEnable
-                val province = settingsViewModel.iptvProvinceCurrent
-                val filtered = ChannelGroupList(
-                    s.channelGroupList.filter { group ->
-                        if (group.name in hiddenList) return@filter false
-                        if (provinceFilterEnable && province.isNotBlank()) {
-                            // 保留所选省份的分组 + 非省份分组（如“全部”“央视”等）
-                            group.name.contains(province) || !Provinces.isProvinceGroup(group.name)
-                        } else true
-                    }
-                )
-
-                // 过滤条件过严（或省份异步解析完成导致分组被裁掉）时不应得到空列表，
-                // 否则整个界面没有频道可用、经典选台也无法聚焦，回退展示全部分组
-                filtered.ifEmpty { s.channelGroupList }
-            },
+            filteredChannelGroupListProvider = { visibleGroups ?: s.channelGroupList },
             epgListProvider = { s.epgList },
             onBackPressed = onBackPressed,
         )
