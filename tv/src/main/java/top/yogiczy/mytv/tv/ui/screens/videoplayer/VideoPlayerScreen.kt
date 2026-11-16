@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -70,25 +71,31 @@ fun VideoPlayerScreen(
             VideoPlayerDisplayMode.WIDE -> Modifier.aspectRatio(2.35f / 1)
         }
 
-        when (settingsViewModel.videoPlayerRenderMode) {
-            Configs.VideoPlayerRenderMode.SURFACE_VIEW -> {
-                AndroidView(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .then(displayModeModifier),
-                    factory = { SurfaceView(context) },
-                    update = { state.setVideoSurfaceView(it) },
-                )
-            }
+        key(state.renderGeneration, settingsViewModel.videoPlayerRenderMode) {
+            when (settingsViewModel.videoPlayerRenderMode) {
+                Configs.VideoPlayerRenderMode.SURFACE_VIEW -> {
+                    AndroidView(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .then(displayModeModifier),
+                        factory = { SurfaceView(context) },
+                        onReset = null,
+                        onRelease = { state.clearVideoSurfaceView(it) },
+                        update = { state.setVideoSurfaceView(it) },
+                    )
+                }
 
-            Configs.VideoPlayerRenderMode.TEXTURE_VIEW -> {
-                AndroidView(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .then(displayModeModifier),
-                    factory = { TextureView(context) },
-                    update = { state.setVideoTextureView(it) },
-                )
+                Configs.VideoPlayerRenderMode.TEXTURE_VIEW -> {
+                    AndroidView(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .then(displayModeModifier),
+                        factory = { TextureView(context) },
+                        onReset = null,
+                        onRelease = { state.clearVideoTextureView(it) },
+                        update = { state.setVideoTextureView(it) },
+                    )
+                }
             }
         }
     }

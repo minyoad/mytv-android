@@ -27,6 +27,11 @@ abstract class VideoPlayer(
 
     abstract fun prepare(url: String)
 
+    open fun prepare(url: String, playWhenReady: Boolean) {
+        prepare(url)
+        if (!playWhenReady) pause()
+    }
+
     abstract fun play()
 
     abstract fun pause()
@@ -41,6 +46,7 @@ abstract class VideoPlayer(
 
     abstract fun setVideoSurfaceView(surfaceView: SurfaceView)
     abstract fun setVideoTextureView(textureView: TextureView)
+    open fun clearVideoSurface() {}
 
     private var loadTimeoutJob: Job? = null
     private var interruptJob: Job? = null

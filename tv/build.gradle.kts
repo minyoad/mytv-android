@@ -165,6 +165,7 @@ dependencies {
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.junit)
+    testImplementation("org.mockito:mockito-core:5.14.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)

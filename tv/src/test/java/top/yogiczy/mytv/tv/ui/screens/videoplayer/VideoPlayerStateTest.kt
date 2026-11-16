@@ -22,7 +22,9 @@ class VideoPlayerStateTest {
         var plays = 0
         var pauses = 0
         var releases = 0
+        val prepareIntents = mutableListOf<Boolean>()
         override fun prepare(url: String) { prepared += url }
+        override fun prepare(url: String, playWhenReady: Boolean) { prepare(url); prepareIntents += playWhenReady }
         override fun play() { plays++ }
         override fun pause() { pauses++ }
         override fun seekTo(position: Long) { seeks += position }
@@ -73,6 +75,7 @@ class VideoPlayerStateTest {
         assertEquals(listOf("vod"), replacement.prepared)
         assertTrue(replacement.seeks.isEmpty())
         assertEquals(0, replacement.pauses)
+        assertEquals(listOf(false), replacement.prepareIntents)
         replacement.ready()
         assertEquals(listOf(500L), replacement.seeks)
         assertEquals(1, replacement.pauses)
@@ -157,6 +160,20 @@ class VideoPlayerStateTest {
         time = 10; state.prepare("completed")
         time = 30; player.firstFrame(); player.firstFrame()
         assertEquals(listOf(20L), samples)
+        state.release()
+    }
+
+    @Test fun engineSwitchRecreatesRenderViewAndDoesNotSeekEpochLivePosition() = runTest {
+        val old = Fake(backgroundScope)
+        val replacement = Fake(backgroundScope)
+        val state = VideoPlayerState(old, settings.type, { replacement }, { settings })
+        state.initialize(); state.prepare("live")
+        old.progress(1_800_000_000_000L, 60000L)
+        assertEquals(0L, state.renderGeneration)
+        state.changePlayerType(Configs.VideoPlayerType.IJK)
+        assertEquals(1L, state.renderGeneration)
+        replacement.ready()
+        assertTrue(replacement.seeks.isEmpty())
         state.release()
     }
 }

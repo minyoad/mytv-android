@@ -418,6 +418,8 @@ class Media3VideoPlayer(
     }
 
     override fun release() {
+        updatePositionJob?.cancel()
+        updatePositionJob = null
         ioRetryJob?.cancel()
         ioRetryJob = null
         videoPlayer.removeListener(playerListener)
@@ -462,4 +464,6 @@ class Media3VideoPlayer(
 //        TODO("Not yet implemented")
         videoPlayer.setVideoTextureView(textureView)
     }
+
+    override fun clearVideoSurface() { videoPlayer.clearVideoSurface() }
 }

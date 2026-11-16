@@ -44,6 +44,8 @@ class VideoPlayerState(
     var currentPosition by mutableLongStateOf(0L)
         private set
     var metadata by mutableStateOf(VideoPlayer.Metadata())
+    var renderGeneration by mutableLongStateOf(0L)
+        private set
 
     private sealed interface RenderTarget {
         data class Surface(val view: SurfaceView) : RenderTarget
@@ -76,7 +78,7 @@ class VideoPlayerState(
         isAutoDisplayModeSet = false
         measurement?.cancel()
         measurement = timings.start("playback_to_first_frame_ms")
-        instance.prepare(url)
+        instance.prepare(url, playWhenReady)
     }
 
     fun play() { if (!released) { playWhenReady = true; instance.play() } }
@@ -101,6 +103,18 @@ class VideoPlayerState(
         renderTarget = RenderTarget.Texture(view)
         instance.setVideoTextureView(view)
     }
+    fun clearVideoSurfaceView(view: SurfaceView) {
+        if ((renderTarget as? RenderTarget.Surface)?.view === view) {
+            renderTarget = null
+            if (!released) instance.clearVideoSurface()
+        }
+    }
+    fun clearVideoTextureView(view: TextureView) {
+        if ((renderTarget as? RenderTarget.Texture)?.view === view) {
+            renderTarget = null
+            if (!released) instance.clearVideoSurface()
+        }
+    }
     fun onReady(listener: () -> Unit) { onReadyListeners.add(listener) }
     fun onError(listener: () -> Unit) { onErrorListeners.add(listener) }
     fun onInterrupt(listener: () -> Unit) { onInterruptListeners.add(listener) }
@@ -110,17 +124,15 @@ class VideoPlayerState(
         val old = instance
         val replacement = createPlayer(type)
         val url = currentUrl
-        val restore = Restore(currentPosition.takeIf { duration > 0 && it > 0 }, playWhenReady)
+        // Live Media3 positions may be epoch timestamps, even with a positive sliding-window duration.
+        val restore = Restore(currentPosition.takeIf { duration > 0 && it > 0 && it < duration }, playWhenReady)
         // Retire the old engine before release, so its queued callbacks cannot mutate the replacement.
         instance = replacement
         playerType = type
+        renderTarget = null
+        renderGeneration++
         old.release()
         if (initialized) bind(replacement)
-        when (val target = renderTarget) {
-            is RenderTarget.Surface -> replacement.setVideoSurfaceView(target.view)
-            is RenderTarget.Texture -> replacement.setVideoTextureView(target.view)
-            null -> Unit
-        }
         if (url != null) start(url, restore)
     }
 
