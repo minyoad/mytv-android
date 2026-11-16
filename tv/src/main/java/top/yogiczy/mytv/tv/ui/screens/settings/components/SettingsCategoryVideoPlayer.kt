@@ -17,14 +17,12 @@ import top.yogiczy.mytv.tv.ui.screens.components.SelectDialog
 import top.yogiczy.mytv.tv.ui.screens.settings.SettingsViewModel
 import top.yogiczy.mytv.tv.ui.screens.videoplayerdiaplaymode.VideoPlayerDisplayModeScreen
 import top.yogiczy.mytv.tv.ui.utils.Configs
-import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun SettingsCategoryVideoPlayer(
     modifier: Modifier = Modifier,
     settingsViewModel: SettingsViewModel = viewModel(),
 ) {
-    val context = LocalContext.current
     SettingsContentList(modifier) {
         item {
             SettingsListItem(
@@ -165,8 +163,7 @@ fun SettingsCategoryVideoPlayer(
                         Configs.VideoPlayerType.IJK
                     }
 
-                    // 立即重启当前播放，让新引擎生效
-                    context.sendBroadcast(android.content Intent("top.yogiczy.mytv.tv.RESTART_PLAY"))
+
                 },
             )
         }

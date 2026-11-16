@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "media3_java": {
+    "repository": "https://github.com/minyoad/media",
+    "candidate_revision": "37c0c6168694423b6177ccd6e16980d0d6f20549",
+    "reported_version": "1.10.1",
+    "bundled_source_revision": null,
+    "rebuild_verified": false,
+    "modules": [
+      "common",
+      "container",
+      "database",
+      "datasource",
+      "datasource-rtmp",
+      "decoder",
+      "exoplayer",
+      "exoplayer-hls",
+      "exoplayer-rtsp",
+      "extractor"
+    ]
+  },
+  "native": {
+    "artifacts": [
+      "tv/libs/media3-ffmpeg-decoder-1.6.1+2.aar",
+      "ijkplayer-java/jniLibs/**/*.so"
+    ],
+    "source_revision": null,
+    "ndk_version": null,
+    "ffmpeg_revision": null,
+    "build_flags": null,
+    "rebuild_verified": false
+  }
+}

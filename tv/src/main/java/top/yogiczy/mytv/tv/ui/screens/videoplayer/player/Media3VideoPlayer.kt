@@ -255,6 +255,7 @@ class Media3VideoPlayer(
     }
 
     private val playerListener = object : Player.Listener {
+        override fun onRenderedFirstFrame() { triggerFirstFrame() }
         override fun onVideoSizeChanged(videoSize: VideoSize) {
             triggerResolution(videoSize.width, videoSize.height)
         }

@@ -12,13 +12,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine   // 1. 新增
 import androidx.compose.ui.platform.LocalContext          // 2. 新增
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.content.BroadcastReceiver
-import androidx.core.content.ContextCompat
 import top.yogiczy.mytv.core.data.entities.channel.Channel
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList
 import top.yogiczy.mytv.core.data.entities.channel.ChannelGroupList.Companion.channelIdx
@@ -118,28 +113,6 @@ class MainContentState(
         changeCurrentChannel(channelGroupList.channelList.getOrElse(settingsViewModel.iptvLastChannelIdx) {
             channelGroupList.channelList.firstOrNull() ?: Channel()
         })
-
-        /* 新增：监听 RESTART_PLAY 广播，收到后重新 prepare 当前频道 */
-        coroutineScope.launch {
-            suspendCancellableCoroutine<Unit> { cont ->
-                val receiver = object : BroadcastReceiver() {
-                    override fun onReceive(ctx: Context, intent: Intent) {
-                        if (intent.action == "top.yogiczy.mytv.tv.RESTART_PLAY") {
-                            restartCurrentChannel()
-                        }
-                    }
-                }
-                val filter = IntentFilter("top.yogiczy.mytv.tv.RESTART_PLAY")
-                ContextCompat.registerReceiver(
-                    context,
-                    receiver,
-                    filter,
-                    ContextCompat.RECEIVER_NOT_EXPORTED
-                )
-                cont.invokeOnCancellation { context.unregisterReceiver(receiver) }
-                // 永久挂起，直到作用域被取消
-            }
-        }
 
         videoPlayerState.onReady {
             settingsViewModel.iptvPlayableHostList += getUrlHost(_currentChannel.urlList[_currentChannelUrlIdx])
@@ -356,7 +329,7 @@ class MainContentState(
      * - 应用从后台回到前台：直播流在后台仍在缓冲，回到前台后播放器继续消费
      *   后台期间累积的缓存，画面停留在离开时的旧内容，必须重新 prepare 才能拉到最新画面。
      * - 播放卡住（onInterrupt）：需要重新建流恢复。
-     * - RESTART_PLAY 广播。
+     * - 播放控制界面的重启操作。
      *
      * 直接调用 changeCurrentChannel 会被其幂等守卫拦截（三者都未变化），故需 force。
      */

@@ -145,6 +145,7 @@ class IJKVideoPlayer(
                 IMediaPlayer.MEDIA_INFO_BUFFERING_START -> triggerBuffering(true)
                 IMediaPlayer.MEDIA_INFO_BUFFERING_END -> triggerBuffering(false)
                 IMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START -> {
+                    triggerFirstFrame()
                     triggerIsPlayingChanged(true)
                     // 首帧渲染后解码器已初始化，此时能拿到完整的解码器信息
                     updateMetadata()
@@ -273,7 +274,8 @@ class IJKVideoPlayer(
         prepareJob?.cancel()
         resetReconnectState(endBuffering = true)
         val player = ijkPlayer
-        coroutineScope.launch(Dispatchers.IO) {
+        // Native cleanup must finish even when the UI playback scope has been cancelled.
+        CoroutineScope(Dispatchers.IO).launch {
             playerMutex.withLock {
                 try {
                     player.reset()

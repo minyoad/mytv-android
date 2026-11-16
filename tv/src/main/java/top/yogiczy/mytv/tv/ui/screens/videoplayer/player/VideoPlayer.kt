@@ -11,6 +11,7 @@ import top.yogiczy.mytv.tv.ui.utils.Configs
 
 abstract class VideoPlayer(
     private val coroutineScope: CoroutineScope,
+    private val timeoutProvider: () -> Long = { Configs.videoPlayerLoadTimeout },
 ) {
     protected var metadata = Metadata()
 
@@ -19,6 +20,8 @@ abstract class VideoPlayer(
     }
 
     open fun release() {
+        loadTimeoutJob?.cancel()
+        interruptJob?.cancel()
         clearAllListeners()
     }
 
@@ -46,6 +49,7 @@ abstract class VideoPlayer(
     private val onResolutionListeners = mutableListOf<(width: Int, height: Int) -> Unit>()
     private val onErrorListeners = mutableListOf<(error: PlaybackException?) -> Unit>()
     private val onReadyListeners = mutableListOf<() -> Unit>()
+    private val onFirstFrameListeners = mutableListOf<() -> Unit>()
     private val onBufferingListeners = mutableListOf<(buffering: Boolean) -> Unit>()
     private val onPreparedListeners = mutableListOf<() -> Unit>()
 
@@ -59,6 +63,7 @@ abstract class VideoPlayer(
         onResolutionListeners.clear()
         onErrorListeners.clear()
         onReadyListeners.clear()
+        onFirstFrameListeners.clear()
         onBufferingListeners.clear()
         onPreparedListeners.clear()
         onIsPlayingChanged.clear()
@@ -90,6 +95,9 @@ abstract class VideoPlayer(
         loadTimeoutJob?.cancel()
     }
 
+    protected fun triggerFirstFrame() { onFirstFrameListeners.toList().forEach { it() } }
+    fun onFirstFrame(listener: () -> Unit) { onFirstFrameListeners.add(listener) }
+
     protected fun triggerBuffering(buffering: Boolean) {
         onBufferingListeners.forEach { it(buffering) }
     }
@@ -99,7 +107,7 @@ abstract class VideoPlayer(
         loadTimeoutJob?.cancel()
         loadTimeoutJob = coroutineScope.launch {
 
-            delay(Configs.videoPlayerLoadTimeout)
+            delay(timeoutProvider())
             triggerError(PlaybackException.LOAD_TIMEOUT)
         }
         interruptJob?.cancel()
@@ -123,7 +131,7 @@ abstract class VideoPlayer(
         if (currentPosition != position) {
             interruptJob?.cancel()
             interruptJob = coroutineScope.launch {
-                delay(Configs.videoPlayerLoadTimeout)
+                delay(timeoutProvider())
                 onInterruptListeners.forEach { it() }
             }
         }

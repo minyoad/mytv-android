@@ -164,6 +164,8 @@ dependencies {
     implementation(libs.androidx.profileinstaller)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.junit)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
@@ -174,3 +176,5 @@ composeCompiler {
     reportsDestination = layout.buildDirectory.dir("compose_compiler")
     metricsDestination = layout.buildDirectory.dir("compose_compiler")
 }
+
+tasks.named("preBuild") { dependsOn(rootProject.tasks.named("verifyPlayerArtifacts")) }

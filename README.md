@@ -5,7 +5,7 @@
 
 ![GitHub Repo stars](https://img.shields.io/github/stars/minyoad/mytv-android)
 ![GitHub all releases](https://img.shields.io/github/downloads/minyoad/mytv-android/total)
-[![Android Sdk Require](https://img.shields.io/badge/Android-5.0%2B-informational?logo=android)](https://apilevels.com/#:~:text=Jetpack%20Compose%20requires%20a%20minSdk%20of%2021%20or%20higher)
+[![Android Sdk Require](https://img.shields.io/badge/Android-6.0%2B-informational?logo=android)](https://apilevels.com/)
 [![GitHub](https://img.shields.io/github/license/minyoad/mytv-android)](https://github.com/minyoad/mytv-android)
 
 </div>
@@ -85,7 +85,7 @@
 
 ## 说明
 
-- 仅支持Android5及以上
+- 仅支持Android6及以上（minSdk 23）
 - 部分直播源要求网络环境必须支持IPV6
 - 只在自家电视上测过，其他电视稳定性未知
 
@@ -106,6 +106,7 @@
 - [ ] 性能优化
 
 ## 发布
+- 播放器依赖校验、源码重建及启动/换台性能采集：[开发说明](docs/PLAYER_BUILD_AND_PERFORMANCE.md)
 - 发布流程：
     1. 确保项目代码已更新到最新版本
     2. 执行`release.sh`脚本，按照提示输入新版本号

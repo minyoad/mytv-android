@@ -12,10 +12,12 @@ import coil.util.DebugLogger
 import top.yogiczy.mytv.core.data.AppData
 import top.yogiczy.mytv.core.data.network.OkHttp
 import top.yogiczy.mytv.core.data.utils.Globals
+import top.yogiczy.mytv.tv.diagnostics.AppPerformance
 
 class MyTVApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
+        AppPerformance.start()
 
         AppData.init(applicationContext)
         UnsafeTrustManager.enableUnsafeTrustManager()

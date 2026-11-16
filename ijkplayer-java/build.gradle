@@ -38,3 +38,5 @@ dependencies {
     // implementation("com.github.CarGuo.GSYVideoPlayer:gsyvideoplayer-ex_so:v10.1.0")
 
 }
+
+tasks.named('preBuild') { dependsOn(rootProject.tasks.named('verifyPlayerArtifacts')) }

@@ -14,6 +14,8 @@ import top.yogiczy.mytv.core.data.entities.iptvsource.IptvSourceList
 import top.yogiczy.mytv.core.data.utils.Constants
 import top.yogiczy.mytv.core.data.utils.SP
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.VideoPlayerDisplayMode
+import top.yogiczy.mytv.tv.data.PlayerSettingsRepository
+import top.yogiczy.mytv.tv.data.PlayerSettings
 
 /**
  * 应用配置
@@ -23,6 +25,7 @@ object Configs {
     val onKeyChanged = _onKeyChanged.asSharedFlow()
 
     private fun notifyChange(key: KEY) {
+        if (key.name.startsWith("VIDEO_PLAYER_")) PlayerSettingsRepository.refresh()
         _onKeyChanged.tryEmit(key)
     }
 
@@ -568,9 +571,9 @@ object Configs {
 
     /** 播放器 加载超时 */
     var videoPlayerLoadTimeout: Long
-        get() = SP.getLong(KEY.VIDEO_PLAYER_LOAD_TIMEOUT.name, Constants.VIDEO_PLAYER_LOAD_TIMEOUT)
+        get() = PlayerSettings.normalizeTimeout(SP.getLong(KEY.VIDEO_PLAYER_LOAD_TIMEOUT.name, Constants.VIDEO_PLAYER_LOAD_TIMEOUT))
         set(value) {
-            SP.putLong(KEY.VIDEO_PLAYER_LOAD_TIMEOUT.name, value)
+            SP.putLong(KEY.VIDEO_PLAYER_LOAD_TIMEOUT.name, PlayerSettings.normalizeTimeout(value))
             notifyChange(KEY.VIDEO_PLAYER_LOAD_TIMEOUT)
         }
 
@@ -634,7 +637,9 @@ object Configs {
 
     /** 播放器类型 */
     var videoPlayerType: VideoPlayerType
-        get() = VideoPlayerType.valueOf(SP.getString(KEY.VIDEO_PLAYER_TYPE.name, VideoPlayerType.MEDIA3.name))
+        get() = VideoPlayerType.entries.firstOrNull {
+            it.name == SP.getString(KEY.VIDEO_PLAYER_TYPE.name, VideoPlayerType.MEDIA3.name)
+        } ?: VideoPlayerType.MEDIA3
         set(value) {
             SP.putString(KEY.VIDEO_PLAYER_TYPE.name, value.name)
             notifyChange(KEY.VIDEO_PLAYER_TYPE)

@@ -24,9 +24,10 @@ import top.yogiczy.mytv.core.data.repositories.ValidatedFileCache
 import top.yogiczy.mytv.tv.ui.material.Snackbar
 import top.yogiczy.mytv.tv.ui.screens.videoplayer.VideoPlayerDisplayMode
 import top.yogiczy.mytv.tv.ui.utils.Configs
+import top.yogiczy.mytv.tv.data.PlayerSettingsRepository
 
 class SettingsViewModel : ViewModel() {
-    var onVideoPlayerTypeChanged: ((Configs.VideoPlayerType) -> Unit)? = null
+    private var playerSettings by mutableStateOf(PlayerSettingsRepository.settings.value)
     private var _appBootLaunch by mutableStateOf(Configs.appBootLaunch)
     var appBootLaunch: Boolean
         get() = _appBootLaunch
@@ -201,16 +202,10 @@ class SettingsViewModel : ViewModel() {
             Configs.iptvAutoProbeDailyLimit = value
         }
         
-    private var _videoPlayerType by mutableStateOf(Configs.videoPlayerType)
     var videoPlayerType: Configs.VideoPlayerType
-        get() = _videoPlayerType
-        set(value) {
-            Configs.videoPlayerType = value
-        }
+        get() = playerSettings.type
+        set(value) { Configs.videoPlayerType = value }
 
-    var videoPlayerTypeValue: Configs.VideoPlayerType = Configs.VideoPlayerType.MEDIA3
-        get() = videoPlayerType
-    
     fun getVideoPlayerTypeLabel(type: Configs.VideoPlayerType): String = when (type) {
         Configs.VideoPlayerType.IJK -> "IJK播放器"
         Configs.VideoPlayerType.MEDIA3 -> "Media3播放器"
@@ -328,63 +323,33 @@ class SettingsViewModel : ViewModel() {
             Configs.updateChannel = value
         }
 
-    private var _videoPlayerUserAgent by mutableStateOf(Configs.videoPlayerUserAgent)
     var videoPlayerUserAgent: String
-        get() = _videoPlayerUserAgent
-        set(value) {
-            Configs.videoPlayerUserAgent = value
-        }
-
-    private var _videoPlayerLoadTimeout by mutableLongStateOf(Configs.videoPlayerLoadTimeout)
+        get() = playerSettings.userAgent
+        set(value) { Configs.videoPlayerUserAgent = value }
     var videoPlayerLoadTimeout: Long
-        get() = _videoPlayerLoadTimeout
-        set(value) {
-            Configs.videoPlayerLoadTimeout = value
-        }
-
-    private var _videoPlayerAspectRatio by mutableStateOf(Configs.videoPlayerDisplayMode)
+        get() = playerSettings.loadTimeout
+        set(value) { Configs.videoPlayerLoadTimeout = value }
     var videoPlayerDisplayMode: VideoPlayerDisplayMode
-        get() = _videoPlayerAspectRatio
-        set(value) {
-            Configs.videoPlayerDisplayMode = value
-        }
-
-    private var _videoPlayerForceAudioSoftDecode by mutableStateOf(Configs.videoPlayerForceSoftDecode)
+        get() = playerSettings.displayMode
+        set(value) { Configs.videoPlayerDisplayMode = value }
     var videoPlayerForceSoftDecode: Boolean
-        get() = _videoPlayerForceAudioSoftDecode
-        set(value) {
-            Configs.videoPlayerForceSoftDecode = value
-        }
-
-    private var _videoPlayerRenderMode by mutableStateOf(Configs.videoPlayerRenderMode)
+        get() = playerSettings.forceSoftDecode
+        set(value) { Configs.videoPlayerForceSoftDecode = value }
     var videoPlayerRenderMode: Configs.VideoPlayerRenderMode
-        get() = _videoPlayerRenderMode
-        set(value) {
-            Configs.videoPlayerRenderMode = value
-        }
-
-    private var _videoPlayerStopPreviousMediaItem by mutableStateOf(Configs.videoPlayerStopPreviousMediaItem)
+        get() = playerSettings.renderMode
+        set(value) { Configs.videoPlayerRenderMode = value }
     var videoPlayerStopPreviousMediaItem: Boolean
-        get() = _videoPlayerStopPreviousMediaItem
-        set(value) {
-            Configs.videoPlayerStopPreviousMediaItem = value
-        }
-
-    private var _videoPlayerSkipMultipleFramesOnSameVSync by mutableStateOf(Configs.videoPlayerSkipMultipleFramesOnSameVSync)
+        get() = playerSettings.stopPreviousMediaItem
+        set(value) { Configs.videoPlayerStopPreviousMediaItem = value }
     var videoPlayerSkipMultipleFramesOnSameVSync: Boolean
-        get() = _videoPlayerSkipMultipleFramesOnSameVSync
-        set(value) {
-            Configs.videoPlayerSkipMultipleFramesOnSameVSync = value
-        }
-
-    private var _videoPlayerAutoFillForSD by mutableStateOf(Configs.videoPlayerAutoFillForSD)
+        get() = playerSettings.skipMultipleFramesOnSameVSync
+        set(value) { Configs.videoPlayerSkipMultipleFramesOnSameVSync = value }
     var videoPlayerAutoFillForSD: Boolean
-        get() = _videoPlayerAutoFillForSD
-        set(value) {
-            Configs.videoPlayerAutoFillForSD = value
-        }
+        get() = playerSettings.autoFillForSD
+        set(value) { Configs.videoPlayerAutoFillForSD = value }
 
     init {
+        viewModelScope.launch { PlayerSettingsRepository.settings.collect { playerSettings = it } }
         // 删除过期的预约
         _epgChannelReserveList = EpgProgrammeReserveList(
             _epgChannelReserveList.filter {
@@ -434,18 +399,6 @@ class SettingsViewModel : ViewModel() {
                     Configs.KEY.UI_SCREEN_AUTO_CLOSE_DELAY -> _uiScreenAutoCloseDelay = Configs.uiScreenAutoCloseDelay
                     Configs.KEY.UPDATE_FORCE_REMIND -> _updateForceRemind = Configs.updateForceRemind
                     Configs.KEY.UPDATE_CHANNEL -> _updateChannel = Configs.updateChannel
-                    Configs.KEY.VIDEO_PLAYER_USER_AGENT -> _videoPlayerUserAgent = Configs.videoPlayerUserAgent
-                    Configs.KEY.VIDEO_PLAYER_LOAD_TIMEOUT -> _videoPlayerLoadTimeout = Configs.videoPlayerLoadTimeout
-                    Configs.KEY.VIDEO_PLAYER_DISPLAY_MODE -> _videoPlayerAspectRatio = Configs.videoPlayerDisplayMode
-                    Configs.KEY.VIDEO_PLAYER_FORCE_AUDIO_SOFT_DECODE -> _videoPlayerForceAudioSoftDecode = Configs.videoPlayerForceSoftDecode
-                    Configs.KEY.VIDEO_PLAYER_RENDER_MODE -> _videoPlayerRenderMode = Configs.videoPlayerRenderMode
-                    Configs.KEY.VIDEO_PLAYER_TYPE -> {
-                        _videoPlayerType = Configs.videoPlayerType
-                        onVideoPlayerTypeChanged?.invoke(_videoPlayerType)
-                    }
-                    Configs.KEY.VIDEO_PLAYER_STOP_PREVIOUS_MEDIA_ITEM -> _videoPlayerStopPreviousMediaItem = Configs.videoPlayerStopPreviousMediaItem
-                    Configs.KEY.VIDEO_PLAYER_SKIP_MULTIPLE_FRAMES_ON_SAME_VSYNC -> _videoPlayerSkipMultipleFramesOnSameVSync = Configs.videoPlayerSkipMultipleFramesOnSameVSync
-                    Configs.KEY.VIDEO_PLAYER_AUTO_FILL_FOR_SD -> _videoPlayerAutoFillForSD = Configs.videoPlayerAutoFillForSD
                     else -> {}
                 }
             }
