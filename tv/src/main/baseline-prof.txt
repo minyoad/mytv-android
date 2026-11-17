@@ -1,0 +1,40 @@
+# Baseline Profile：应用启动 + 后台重 CPU 解析热路径
+# 说明：
+#  - 规则必须使用「原始类名 + 精确 JVM 方法描述符」。profgen 只支持有限的通配
+#    （单段参数 *），参数个数不定时通配会匹配失败被静默丢弃，因此这里全部用精确签名。
+#  - AGP 构建时会结合 R8 mapping 自动重写为混淆后名称。
+#  - Compose/Lifecycle 等库自带 profile 已由依赖传入；Composable 启动即被 JIT，
+#    此处只补 JIT 覆盖不到的后台解析路径（弱机 32 位上收益最大）。
+
+# ============ 应用启动 ============
+Ltop/yogiczy/mytv/tv/MyTVApplication;
+HSPLtop/yogiczy/mytv/tv/MyTVApplication;-><init>()V
+HSPLtop/yogiczy/mytv/tv/MyTVApplication;->onCreate()V
+HSPLtop/yogiczy/mytv/tv/MyTVApplication;->newImageLoader()Lcoil/ImageLoader;
+Ltop/yogiczy/mytv/tv/MainActivity;
+HSPLtop/yogiczy/mytv/tv/MainActivity;-><init>()V
+HSPLtop/yogiczy/mytv/tv/MainActivity;->onCreate(Landroid/os/Bundle;)V
+
+# ============ EPG 解析（24MB XML 全量解析，后台线程） ============
+HSPLtop/yogiczy/mytv/core/data/repositories/epg/EpgXmlParser;->parse(Ljava/io/InputStream;Ljava/util/Set;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+HSPLtop/yogiczy/mytv/core/data/repositories/epg/EpgXmlParser;->readChildText(Lorg/xmlpull/v1/XmlPullParser;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+HSPLtop/yogiczy/mytv/core/data/repositories/epg/EpgXmlParser;->parseXmltvDate(Ljava/lang/String;)Ljava/lang/Long;
+HSPLtop/yogiczy/mytv/core/data/repositories/epg/EpgXmlParser;->daysFromCivil(III)J
+HSPLtop/yogiczy/mytv/core/data/repositories/epg/EpgRepository;->getEpgList(Ljava/util/List;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+HSPLtop/yogiczy/mytv/core/data/repositories/epg/EpgRepository;->observeEpgList(Ljava/util/List;I)Lkotlinx/coroutines/flow/Flow;
+HSPLtop/yogiczy/mytv/core/data/repositories/epg/EpgRepository;->load(Ljava/util/List;ILkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+
+# ============ 直播源获取与解析（1.6MB / 5973 频道） ============
+Ltop/yogiczy/mytv/core/data/repositories/ValidatedFileCache;
+HSPLtop/yogiczy/mytv/core/data/repositories/iptv/IptvRepository;->getChannelGroupList(JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+HSPLtop/yogiczy/mytv/core/data/repositories/iptv/IptvRepository;->getCachedChannelGroupList(Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+HSPLtop/yogiczy/mytv/core/data/repositories/iptv/parser/TxtIptvParser;->parse(Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+HSPLtop/yogiczy/mytv/core/data/repositories/iptv/parser/M3uIptvParser;->parse(Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+HSPLtop/yogiczy/mytv/core/data/repositories/iptv/parser/DefaultIptvParser;->parse(Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+
+# ============ 频道名标准化与索引（解析与换台按键路径） ============
+HSPLtop/yogiczy/mytv/core/data/utils/ChannelUtil;->standardChannelName(Ljava/lang/String;)Ljava/lang/String;
+HSPLtop/yogiczy/mytv/core/data/utils/ChannelUtil;->loadHybridWebViewUrlFromRemote(Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+HSPLtop/yogiczy/mytv/core/data/entities/channel/ChannelGroupListKt;->channelIdx(Ltop/yogiczy/mytv/core/data/entities/channel/ChannelGroupList;Ltop/yogiczy/mytv/core/data/entities/channel/Channel;)I
+HSPLtop/yogiczy/mytv/core/data/entities/channel/ChannelGroupListKt;->channelGroupIdx(Ltop/yogiczy/mytv/core/data/entities/channel/ChannelGroupList;Ltop/yogiczy/mytv/core/data/entities/channel/Channel;)I
+HSPLtop/yogiczy/mytv/core/data/entities/channel/ChannelGroupListKt;->getChannelList(Ltop/yogiczy/mytv/core/data/entities/channel/ChannelGroupList;)Ltop/yogiczy/mytv/core/data/entities/channel/ChannelList;

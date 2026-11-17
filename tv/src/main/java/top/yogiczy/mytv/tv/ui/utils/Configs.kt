@@ -284,18 +284,26 @@ object Configs {
             notifyChange(KEY.IPTV_SOURCE_CACHE_TIME)
         }
 
+    // iptvChannelUrlIdx 内存缓存：换台按键路径会频繁读取，
+    // 避免每次都走 SP 读取 + Gson 全量解析。写入都经由 setter，缓存保持一致。
+    private var iptvChannelUrlIdxCache: Map<String, Int>? = null
+
     var iptvChannelUrlIdx: Map<String, Int>
         get() {
-            var jsonString=SP.getString(KEY.IPTV_CHANNEL_URL_INDEX.name, "")
+            iptvChannelUrlIdxCache?.let { return it }
+            var jsonString = SP.getString(KEY.IPTV_CHANNEL_URL_INDEX.name, "")
             if (jsonString.isBlank()) {
                 jsonString = "{}"
             }
             // 将 JSON 字符串转换回 Map
             val gson = Gson()
             val type = object : TypeToken<Map<String, Int>>() {}.type
-            return gson.fromJson(jsonString, type)
+            val map = gson.fromJson<Map<String, Int>>(jsonString, type) ?: emptyMap()
+            iptvChannelUrlIdxCache = map
+            return map
         }
         set(value) {    // 将 Map 转换为 JSON 字符串
+            iptvChannelUrlIdxCache = value
             val gson = Gson()
             val jsonString = gson.toJson(value)
             SP.putString(KEY.IPTV_CHANNEL_URL_INDEX.name, jsonString)

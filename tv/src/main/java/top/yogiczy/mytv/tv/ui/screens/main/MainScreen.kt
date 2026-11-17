@@ -71,16 +71,21 @@ fun MainScreen(
 
     val ready = uiState as? MainUiState.Ready
     val sourceGroups = ready?.channelGroupList
-    val visibleGroups = sourceGroups?.let { groups ->
-        val hidden = settingsViewModel.iptvChannelGroupHiddenList
-        val province = settingsViewModel.iptvProvinceCurrent
-        ChannelGroupList(
-            groups.filter { group ->
-                group.name !in hidden && (!settingsViewModel.iptvProvinceFilterEnable || province.isBlank() ||
-                    group.name.contains(province) || !Provinces.isProvinceGroup(group.name))
-            },
-            epgUrl = groups.epgUrl,
-        ).ifEmpty { groups }
+    // remember 包裹过滤结果：依赖不变时保持同一实例，
+    // 避免每次重组都重新 filter 数千频道并生成新对象（下游缓存会随之失效）。
+    val hidden = settingsViewModel.iptvChannelGroupHiddenList
+    val province = settingsViewModel.iptvProvinceCurrent
+    val provinceFilterEnable = settingsViewModel.iptvProvinceFilterEnable
+    val visibleGroups = remember(sourceGroups, hidden, province, provinceFilterEnable) {
+        sourceGroups?.let { groups ->
+            ChannelGroupList(
+                groups.filter { group ->
+                    group.name !in hidden && (!provinceFilterEnable || province.isBlank() ||
+                        group.name.contains(province) || !Provinces.isProvinceGroup(group.name))
+                },
+                epgUrl = groups.epgUrl,
+            ).ifEmpty { groups }
+        }
     }
     val currentChannel = sourceGroups?.channelList?.getOrNull(settingsViewModel.iptvLastChannelIdx)
     LaunchedEffect(visibleGroups, settingsViewModel.uiShowChannelLogo, currentChannel?.id) {

@@ -10,6 +10,7 @@ import coil.memory.MemoryCache
 import coil.request.CachePolicy
 import coil.util.DebugLogger
 import top.yogiczy.mytv.core.data.AppData
+import top.yogiczy.mytv.tv.BuildConfig
 import top.yogiczy.mytv.core.data.network.OkHttp
 import top.yogiczy.mytv.core.data.utils.Globals
 import top.yogiczy.mytv.tv.diagnostics.AppPerformance
@@ -25,7 +26,9 @@ class MyTVApplication : Application(), ImageLoaderFactory {
 
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
-            .logger(DebugLogger()) // 开启调试日志
+            // DebugLogger 会在 release 包打印全量加载日志（占主线程时间且刷爆 logcat），
+            // 仅 debug 包启用
+            .logger(if (BuildConfig.DEBUG) DebugLogger() else null)
             .components {
                     add(ImageDecoderDecoder.Factory() as Decoder.Factory)
             }

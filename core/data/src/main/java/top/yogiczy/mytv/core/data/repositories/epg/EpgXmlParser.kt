@@ -9,7 +9,6 @@ import top.yogiczy.mytv.core.data.entities.epg.EpgList
 import top.yogiczy.mytv.core.data.entities.epg.EpgProgramme
 import java.io.IOException
 import java.io.InputStream
-import java.text.SimpleDateFormat
 import java.util.Locale
 
 internal object EpgXmlParser {
@@ -28,8 +27,7 @@ internal object EpgXmlParser {
         val names = mutableMapOf<String, String>()
         val programmes = mutableMapOf<String, MutableList<EpgProgramme>>()
         val filter = filteredChannels.map { it.lowercase(Locale.ROOT) }.toSet()
-        val dateFormat = SimpleDateFormat("yyyyMMddHHmmss Z", Locale.ROOT).apply { isLenient = false }
-        fun parseDate(value: String?): Long? = try { value?.let { dateFormat.parse(it)?.time } } catch (_: Exception) { null }
+        fun parseDate(value: String?): Long? = parseXmltvDate(value)
 
         while (parser.next() != XmlPullParser.END_DOCUMENT) {
             currentCoroutineContext().ensureActive()
@@ -78,5 +76,77 @@ internal object EpgXmlParser {
                 XmlPullParser.START_TAG -> if (parser.depth == depth + 1 && parser.name == tag) text = parser.nextText().trim()
             }
         }
+    }
+
+    /**
+     * 手工解析 xmltv 日期（格式 yyyyMMddHHmmss ±HHmm），替代 SimpleDateFormat。
+     * 大节目单（数十 MB、数十万条节目）解析时 SDF 的日历运算开销极大，
+     * 在低端电视上可占解析总耗时的相当比例。
+     *
+     * 语义与原 SimpleDateFormat("yyyyMMddHHmmss Z", lenient=false) 对齐：
+     * - 必须有 14 位数字日期，随后是空白与 ±HHmm 数字时区，否则返回 null；
+     * - 月份/日/时/分/秒超出常规范围返回 null。
+     */
+    private fun parseXmltvDate(value: String?): Long? {
+        if (value == null) return null
+        val len = value.length
+        var i = 0
+        while (i < len && value[i] == ' ') i++
+        if (len - i < 14) return null
+
+        fun digit(): Int {
+            val c = value[i]
+            if (c < '0' || c > '9') throw IllegalArgumentException()
+            i++
+            return c - '0'
+        }
+
+        fun number(count: Int): Int {
+            var v = 0
+            repeat(count) {
+                val d = digit()
+                if (d < 0) throw IllegalArgumentException()
+                v = v * 10 + d
+            }
+            return v
+        }
+
+        return try {
+            val year = number(4)
+            val month = number(2)
+            val day = number(2)
+            val hour = number(2)
+            val minute = number(2)
+            val second = number(2)
+            if (month < 1 || month > 12 || day < 1 || day > 31 ||
+                hour > 23 || minute > 59 || second > 59
+            ) return null
+            while (i < len && value[i] == ' ') i++
+            if (i >= len) return null
+            val sign = when (value[i]) {
+                '+' -> 1
+                '-' -> -1
+                else -> return null
+            }
+            i++
+            val zoneHour = number(2)
+            val zoneMinute = number(2)
+            val offsetMinutes = sign * (zoneHour * 60 + zoneMinute)
+            daysFromCivil(year, month, day) * 86_400_000L +
+                (hour * 3600 + minute * 60 + second) * 1000L -
+                offsetMinutes * 60_000L
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
+
+    /** 自纪元起算的天数（公历格里历，Howard Hinnant 算法），无对象分配。 */
+    private fun daysFromCivil(year: Int, month: Int, day: Int): Long {
+        val y = if (month <= 2) year - 1 else year
+        val era = (if (y >= 0) y else y - 399) / 400
+        val yoe = y - era * 400
+        val doy = (153 * (if (month > 2) month - 3 else month + 9) + 2) / 5 + day - 1
+        val doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+        return era * 146097L + doe - 719468L
     }
 }
