@@ -22,6 +22,7 @@ abstract class VideoPlayer(
     open fun release() {
         loadTimeoutJob?.cancel()
         interruptJob?.cancel()
+        interruptJob = null
         clearAllListeners()
     }
 
@@ -41,6 +42,7 @@ abstract class VideoPlayer(
     open fun stop() {
         loadTimeoutJob?.cancel()
         interruptJob?.cancel()
+        interruptJob = null
         currentPosition = 0L
     }
 
@@ -50,6 +52,7 @@ abstract class VideoPlayer(
 
     private var loadTimeoutJob: Job? = null
     private var interruptJob: Job? = null
+    private var interruptDeadline = 0L
     private var currentPosition = 0L
 
     private val onResolutionListeners = mutableListOf<(width: Int, height: Int) -> Unit>()
@@ -135,10 +138,22 @@ abstract class VideoPlayer(
 
     protected fun triggerCurrentPosition(position: Long) {
         if (currentPosition != position) {
-            interruptJob?.cancel()
-            interruptJob = coroutineScope.launch {
-                delay(timeoutProvider())
-                onInterruptListeners.forEach { it() }
+            // 播放中播放器每秒上报一次进度，原先每秒都 cancel/重建中断检测协程。
+            // 改为截止时间模式：仅在首个进度上报时创建协程，后续只更新截止时间，
+            // 语义不变（最后一次进度更新后超过 timeout 仍无更新才触发中断）
+            interruptDeadline = System.currentTimeMillis() + timeoutProvider()
+            if (interruptJob == null) {
+                interruptJob = coroutineScope.launch {
+                    while (true) {
+                        val remain = interruptDeadline - System.currentTimeMillis()
+                        if (remain <= 0) {
+                            interruptJob = null
+                            onInterruptListeners.forEach { it() }
+                            break
+                        }
+                        delay(remain)
+                    }
+                }
             }
         }
         currentPosition = position
